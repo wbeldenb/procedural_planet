@@ -1,0 +1,16 @@
+﻿  sphericalCoords.cpp
+c:\users\sirdrwilliam\desktop\seniorproject\proceduralplanet\proceduralplanet\apfloat\raw.h(47): warning C4244: '=': conversion from 'rawtype' to 'unsigned int', possible loss of data
+c:\users\sirdrwilliam\desktop\seniorproject\proceduralplanet\proceduralplanet\apfloat\raw.h(49): warning C4244: '=': conversion from 'rawtype' to 'unsigned int', possible loss of data
+c:\users\sirdrwilliam\desktop\seniorproject\proceduralplanet\proceduralplanet\apfloat\modint.h(311): error C2593: 'operator <<' is ambiguous
+  c:\program files (x86)\microsoft visual studio\2017\community\vc\tools\msvc\14.15.26726\include\ostream(400): note: could be 'std::basic_ostream<char,std::char_traits<char>> &std::basic_ostream<char,std::char_traits<char>>::operator <<(unsigned __int64)'
+  c:\users\sirdrwilliam\desktop\seniorproject\proceduralplanet\proceduralplanet\apfloat\raw.h(43): note: or       'std::ostream &operator <<(std::ostream &,rawtype)'
+  c:\users\sirdrwilliam\desktop\seniorproject\proceduralplanet\proceduralplanet\apfloat\modint.h(311): note: while trying to match the argument list '(std::basic_ostream<char,std::char_traits<char>>, rawtype)'
+c:\users\sirdrwilliam\desktop\seniorproject\proceduralplanet\proceduralplanet\sphericalcoords.cpp(13): error C2059: syntax error: ';'
+c:\users\sirdrwilliam\desktop\seniorproject\proceduralplanet\proceduralplanet\sphericalcoords.cpp(14): error C2039: 'apfloat': is not a member of 'glm::tvec3<float,0>'
+  c:\users\sirdrwilliam\documents\visual studio 2017\sdks\glm-0.9.8.5\glm\detail\type_vec.hpp(243): note: see declaration of 'glm::tvec3<float,0>'
+c:\users\sirdrwilliam\desktop\seniorproject\proceduralplanet\proceduralplanet\sphericalcoords.cpp(14): error C2146: syntax error: missing ';' before identifier 'phi'
+c:\users\sirdrwilliam\desktop\seniorproject\proceduralplanet\proceduralplanet\sphericalcoords.cpp(14): error C2039: 'phi': is not a member of 'glm::tvec3<float,0>'
+  c:\users\sirdrwilliam\documents\visual studio 2017\sdks\glm-0.9.8.5\glm\detail\type_vec.hpp(243): note: see declaration of 'glm::tvec3<float,0>'
+c:\users\sirdrwilliam\desktop\seniorproject\proceduralplanet\proceduralplanet\sphericalcoords.cpp(14): error C2039: 'xyz': is not a member of 'glm::tvec3<float,0>'
+  c:\users\sirdrwilliam\documents\visual studio 2017\sdks\glm-0.9.8.5\glm\detail\type_vec.hpp(243): note: see declaration of 'glm::tvec3<float,0>'
+c:\users\sirdrwilliam\desktop\seniorproject\proceduralplanet\proceduralplanet\sphericalcoords.cpp(16): error C2065: 'phi': undeclared identifier
