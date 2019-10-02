@@ -122,6 +122,8 @@ private:
 	//planet constants//
 	////////////////////
 	const double_vec_ planetCenter = double_vec_(0, 0, -(PLANET_RADIUS + 100));
+	//extreme point for LOD refactor testing
+	double_vec_ extPointVertN, extPointVertS, extPointHorzE, extPointHorzW;
 	//number of subdivions to great a n-gon to create planet sphere
 	const int numSides = 100;
 	//angle between center point of the planet for any two adjacent points on the planets equator
@@ -131,8 +133,8 @@ private:
 	//lengh of any side on the planet equator
 	const bigFloat sideLength = planetCircum / numSides;
 	const bigFloat halfSideLength = sideLength / 2;
-	//factor to determine number of base points
-	int terrainNum = 1;
+	//factor to determine number of base points, equal to one quarter of total mesh points
+	int terrainNum = 2;
 	//factor to determine LOD mesh simplification
 	int LODnum = 1;
 	//center point between planet center and the camera
@@ -145,13 +147,17 @@ private:
 	GLuint VertexBufferID;
 	GLuint IndexBufferID;
 	//variables for terrain size
-	int terrainWidth = 100;
+	int terrainWidth = terrainNum * 2;
 	int terrainDepth = 100;
 	float maxAltitude = 20;
 
 	//buffers for terrain generation
-	GLfloat vertexBufferData[100 * 100 * 3] = { 0 };
-	GLuint indexBufferData[99 * 99 * 6] = { 0 };
+	GLfloat *vertexBufferData;
+	GLuint *indexBufferData;
+	//globals to store buffer sizes to ensure data is transfered to GPU  correctly
+	int vertexBufferSize = 0, indexBufferSize = 0;
+	//GLfloat vertexBufferData[12] = { 0 };
+	//GLuint indexBufferData[6] = { 0 };
 
 	int octaves = 8;
 
@@ -163,11 +169,15 @@ public:
 
 	bool mouseDown = false;
 
-	double_vec_ crossDouble(double_vec_ a, double_vec_ b) {
-		bigFloat x = a.y * b.z - a.z * b.y;
-		bigFloat y = a.z * b.x - a.x * b.z;
-		bigFloat z = a.x * b.y - a.y * b.x;
+	double_vec_ crossDouble(double_vec_ u, double_vec_ v) {
+		bigFloat x = u.y * v.z - u.z * v.y;
+		bigFloat y = u.z * v.x - u.x * v.z;
+		bigFloat z = u.x * v.y - u.y * v.x;
 		return double_vec_(x, y, z);
+	}
+
+	vec3 downScale(double_vec_ vec) {
+		return vec3(vec.x.ToFloat(), vec.y.ToFloat(), vec.z.ToFloat());
 	}
 
 	void mouseCallback(GLFWwindow *window, int button, int action, int mods) {
@@ -259,6 +269,43 @@ public:
 		glViewport(0, 0, in_width, in_height);
 	}
 
+	//check to see if the max distance the camera can see extends passed the most extreme point on the generated mesh
+	//return 1 if the mesh needs to be shrunk, 2 if expanded, 3 if fine as is
+	int checkHorizon() {
+		//calculate hypotenuse of right triangle formed by camera, planet center, and farthest visible point on horizon
+		//the lengths of the sides being the the altitude of the camera(h), the planet radius, and len (unknown)
+		float h = distance_vec(myCam.getPos(), planetCenter).ToFloat() - PLANET_RADIUS;
+		//the length from the camera to the farthest visible point on the horizon (rendered or not)
+		float len = sqrt(h*(2*PLANET_RADIUS + h));
+
+		if (distance_vec(myCam.getPos(), extPointVertN) - sideLength > bigFloat(len))
+			return 1;
+		
+		else if (distance_vec(myCam.getPos(), extPointVertS) - sideLength > bigFloat(len))
+			return 1;
+
+		else if (distance_vec(myCam.getPos(), extPointHorzW) - sideLength > bigFloat(len))
+			return 1;
+
+		else if (distance_vec(myCam.getPos(), extPointHorzE) - sideLength > bigFloat(len))
+			return 1;
+
+		else if (distance_vec(myCam.getPos(), extPointVertN) < bigFloat(len))
+			return 2;
+
+		else if (distance_vec(myCam.getPos(), extPointVertS) < bigFloat(len))
+			return 2;
+
+		else if (distance_vec(myCam.getPos(), extPointHorzE) < bigFloat(len))
+			return 2;
+
+		else if (distance_vec(myCam.getPos(), extPointHorzW) < bigFloat(len))
+			return 2;
+
+		else
+			return 3;
+	}
+
 	//downscale from bigFloat vec3 to float vec3
 	vec3 downscale(double_vec_ vec) {
 		bigFloat x, y, z;
@@ -331,236 +378,196 @@ public:
 		return A + ACVec;
 	}
 
-	float getAltitude(float color) {
-		float tempHeight = color / 127.5 - 1.0f;
-		return tempHeight * maxAltitude;
+	//probably can be moved to graphics card, or maybe generate then pass as uniform
+	////////////////////////////////////////////////////////////////
+	//float getAltitude(float color) {
+	//	float tempHeight = color / 127.5 - 1.0f;
+	//	return tempHeight * maxAltitude;
+	//}
+
+	//float generateHeight(float x, float z, int seed) {
+	//	float total = 0;
+	//	for (int i = 0; i < octaves; i++) {
+	//		float divisor = 8.0 / pow(2, i);
+	//		total += getInterpolatedNoise(x / divisor, z / divisor, seed) * (maxAltitude / pow(3, i));
+	//	}
+	//	return total;
+	//}
+
+	//float getInterpolatedNoise(float x, float z, int seed) {
+	//	int intX = (int)x;
+	//	int intZ = (int)z;
+	//	float fracX = x - intX;
+	//	float fracZ = z - intZ;
+
+	//	float v1 = getSmoothNoise(intX, intZ, seed);
+	//	float v2 = getSmoothNoise(intX + 1, intZ, seed);
+	//	float v3 = getSmoothNoise(intX, intZ + 1, seed);
+	//	float v4 = getSmoothNoise(intX + 1, intZ + 1, seed);
+	//	float i1 = interpolate(v1, v2, fracX);
+	//	float i2 = interpolate(v3, v4, fracX);
+	//	return interpolate(i1, i2, fracZ);
+	//}
+
+	//float interpolate(float a, float b, float blend) {
+	//	double t = blend * PI;
+	//	float f = (float)(1.0 - cos(t)) * 0.5f;
+	//	return a * (1 - f) + b * f;
+	//}
+
+	//float getSmoothNoise(int x, int z, int seed) {
+	//	float corners = (getNoise(x - 1, z - 1, seed) + getNoise(x + 1, z - 1, seed) + getNoise(x - 1, z + 1, seed) + getNoise(x + 1, z + 1, seed)) / 16.0f;
+	//	float sides = (getNoise(x - 1, z, seed) + getNoise(x + 1, z, seed) + getNoise(x, z - 1, seed) + getNoise(x, z + 1, seed)) / 8.0f;
+	//	float center = getNoise(x, z, seed) / 4.0f;
+	//	return corners + sides + center;
+	//}
+
+	//float getNoise(int x, int z, int seed) {
+	//	srand(x * 49632 + z * 325176 + seed);
+	//	return ((float)rand() / RAND_MAX) * 2.0f - 1.0f;
+	//}
+	/////////////////////////////////////////////////////////////////////////
+
+	//calculate the surface normal of a triangle with vertices a, b, c
+	double_vec_ calcSurfaceNormalTriangle(double_vec_ a, double_vec_ b, double_vec_ c) {
+		return crossDouble(b - a, c - a);
 	}
 
-	float generateHeight(float x, float z, int seed) {
-		float total = 0;
-		for (int i = 0; i < octaves; i++) {
-			float divisor = 8.0 / pow(2, i);
-			total += getInterpolatedNoise(x / divisor, z / divisor, seed) * (maxAltitude / pow(3, i));
-		}
-		return total;
-	}
-
-	float getInterpolatedNoise(float x, float z, int seed) {
-		int intX = (int)x;
-		int intZ = (int)z;
-		float fracX = x - intX;
-		float fracZ = z - intZ;
-
-		float v1 = getSmoothNoise(intX, intZ, seed);
-		float v2 = getSmoothNoise(intX + 1, intZ, seed);
-		float v3 = getSmoothNoise(intX, intZ + 1, seed);
-		float v4 = getSmoothNoise(intX + 1, intZ + 1, seed);
-		float i1 = interpolate(v1, v2, fracX);
-		float i2 = interpolate(v3, v4, fracX);
-		return interpolate(i1, i2, fracZ);
-	}
-
-	float interpolate(float a, float b, float blend) {
-		double t = blend * PI;
-		float f = (float)(1.0 - cos(t)) * 0.5f;
-		return a * (1 - f) + b * f;
-	}
-
-	float getSmoothNoise(int x, int z, int seed) {
-		float corners = (getNoise(x - 1, z - 1, seed) + getNoise(x + 1, z - 1, seed) + getNoise(x - 1, z + 1, seed) + getNoise(x + 1, z + 1, seed)) / 16.0f;
-		float sides = (getNoise(x - 1, z, seed) + getNoise(x + 1, z, seed) + getNoise(x, z - 1, seed) + getNoise(x, z + 1, seed)) / 8.0f;
-		float center = getNoise(x, z, seed) / 4.0f;
-		return corners + sides + center;
-	}
-
-	float getNoise(int x, int z, int seed) {
-		srand(x * 49632 + z * 325176 + seed);
-		return ((float)rand() / RAND_MAX) * 2.0f - 1.0f;
-	}
-
-	void buildVertexBufferProcedural(GLfloat vertBuff[]) {
-		srand(time(NULL) * 45672134);
-		int seed = rand();
-		int color;
-
-		/*int index = 0;
-		for (int z = 0; z < terrainDepth; z++) {
-			for (int x = 0; x < terrainWidth; x++) {
-				float height = generateHeight(x, z, seed);
-
-				vertBuff[index] = x - terrainWidth / 2;
-				vertBuff[index + 1] = height - 15;
-				vertBuff[index + 2] = z - terrainDepth / 2;
-
-				index += 3;
-			}
-		}*/
-
-		double_vec_ pt = calcCenterSurfacePt();
-		vec3 pt_down = downscale(pt);
-
-		double_vec_ pt_UL = calcSurfacePoint(PI / 4, pt, Sqrt(bigFloat(2)*halfSideLength*halfSideLength));
-		vec3 ptUL_down = downscale(pt_UL);
-
-		double_vec_ pt_LL = calcSurfacePoint(7 * PI / 4, pt, Sqrt(bigFloat(2)*halfSideLength*halfSideLength));
-		vec3 ptLL_down = downscale(pt_LL);
-
-		double_vec_ pt_UR = calcSurfacePoint(3 * PI / 4, pt, Sqrt(bigFloat(2)*halfSideLength*halfSideLength));
-		vec3 ptUR_down = downscale(pt_UR);
-
-		double_vec_ pt_LR = calcSurfacePoint(5 * PI / 4, pt, Sqrt(bigFloat(2)*halfSideLength*halfSideLength));
-		vec3 ptLR_down = downscale(pt_LR);
-
-		//debug first points
-		printf("Center Point {%f, %f, %f}\n", pt_down.x, pt_down.y, pt_down.z);
-		printf("Upper Left Point {%f, %f, %f}\n", ptUL_down.x, ptUL_down.y, ptUL_down.z);
-		printf("Lower Left Point {%f, %f, %f}\n", ptLL_down.x, ptLL_down.y, ptLL_down.z);
-		printf("Upper Right Point {%f, %f, %f}\n", ptUR_down.x, ptUR_down.y, ptUR_down.z);
-		printf("Lower Right Point {%f, %f, %f}\n", ptLR_down.x, ptLR_down.y, ptLR_down.z);
-		printf("LengthX UL UR: %f\n", distance(ptUL_down, ptUR_down));
-		printf("LengthY UL LL: %f\n", distance(ptUL_down, ptLL_down));
-		printf("LengthX LL LR: %f\n", distance(ptLL_down, ptLR_down));
-		printf("LengthY UR LR: %f\n\n", distance(ptLR_down, ptUR_down));
-
-		vertBuff[0] = ptUL_down.x;
-		vertBuff[1] = ptUL_down.y;
-		vertBuff[2] = ptUL_down.z;
-
-		vertBuff[3] = ptLL_down.x;
-		vertBuff[4] = ptLL_down.y;
-		vertBuff[5] = ptLL_down.z;
-
-		vertBuff[6] = ptUR_down.x;
-		vertBuff[7] = ptUR_down.y;
-		vertBuff[8] = ptUR_down.z;
-
-		vertBuff[9] = ptLR_down.x;
-		vertBuff[10] = ptLR_down.y;
-		vertBuff[11] = ptLR_down.z;
-
-		cout << "VBO after generation" << endl;
-		printf("cam pos {%f, %f, %f}\n", myCam.getPos().x.ToFloat(), myCam.getPos().y.ToFloat(), myCam.getPos().z.ToFloat());
-		cout << vertexBufferData[0] << endl;
-		cout << vertexBufferData[1] << endl;
-		cout << vertexBufferData[2] << endl;
-		cout << vertexBufferData[3] << endl;
-		cout << vertexBufferData[4] << endl;
-		cout << vertexBufferData[5] << endl;
-		cout << vertexBufferData[6] << endl;
-		cout << vertexBufferData[7] << endl;
-		cout << vertexBufferData[8] << endl;
-		cout << vertexBufferData[9] << endl;
-		cout << vertexBufferData[10] << endl;
-		cout << vertexBufferData[11] << endl << endl;
-	}
-
-	void buildIndexBuffer(GLuint indexBuff[]) {
-		int index = 0;
-		int row = 1;
-		/*for (int i = 0; i < (terrainWidth - 1) * (terrainDepth - 1) * 6; i += 6) {
-			indexBuff[i] = index;
-			indexBuff[i + 1] = index + 1;
-			indexBuff[i + 2] = index + terrainWidth;
-
-			indexBuff[i + 3] = index + terrainWidth;
-			indexBuff[i + 4] = index + terrainWidth + 1;
-			indexBuff[i + 5] = index + 1;
-
-			if (index % ((int)terrainWidth * row - 2) == 0 && index != 0) {
-				index += 2;
-				row++;
-			}
-
-			else
-				index++;
-		}*/
-
-		indexBuff[0] = 0;
-		indexBuff[1] = 1;
-		indexBuff[2] = 2;
-		indexBuff[3] = 2;
-		indexBuff[4] = 3;
-		indexBuff[5] = 1;
-
+	//calculate distance between any point the surface of a plane
+	bigFloat distanceFromPlane(double_vec_ point, double_vec_ planeNormal) {
+		return (planeNormal.x * point.x + planeNormal.y * point.y + planeNormal.z * point.z) 
+			  / Sqrt(planeNormal.x*planeNormal.x + planeNormal.y*planeNormal.y + planeNormal.z*planeNormal.z);
 	}
 
 	//generate planet mesh (must be done every time the LODnum changes)
-	void generateMesh() {
+	GLfloat * generateMesh(GLfloat * vertices) {
+		//constants
+		const int meshWidth = terrainNum * 2;
+		const int halfMeshWidth = terrainNum;
+
+		//calc extreme points, initially calculated in initGeom()
+		extPointVertN = calcSurfacePoint(PI / 2, extPointVertN, sideLength);
+		extPointVertS = calcSurfacePoint(3 * PI / 2, extPointVertS, sideLength);
+
+		extPointHorzW = calcSurfacePoint(PI, extPointHorzW, sideLength);
+		extPointHorzE = calcSurfacePoint(0, extPointHorzE, sideLength);
+
 		//generate vertex buffer to hand off to OGL
-		glGenBuffers(1, &VertexBufferID);
+		//glGenBuffers(1, &VertexBufferID);
 		//set the current state to focus on our vertex buffer
-		glBindBuffer(GL_ARRAY_BUFFER, VertexBufferID);
+		//glBindBuffer(GL_ARRAY_BUFFER, VertexBufferID);
 
 		//generate an array to store points (vec3s), generated as a LODnum x LODnum square of vec3s (* 3), then mirrored twice (*4)
-		const int bufferSize = terrainNum * terrainNum * 4;
-		double_vec_ * vertices = new double_vec_[bufferSize];
+		vertexBufferSize = terrainNum * terrainNum * 4 * 3; //equivalent to meshWidth * meshWidth * 3
+		//double_vec_ * vertices = new double_vec_[bufferSize];
+		//delete vertices;
+		vertices = new float[vertexBufferSize];
 
 		//calculate new center point
 		centerSurfacePoint = calcCenterSurfacePt();
 		vec3 pt_down = downscale(centerSurfacePoint);
 
 		//lower righthand point of the generated square
-		const int LRindex = terrainNum * terrainNum - 1;
+		const int LRindex = (terrainNum * meshWidth - (terrainNum + 1)) * 3;
 		
 		//calculate upper left point from the center point, the lower righthand point of the generated square
 		double_vec_ pt_UL = calcSurfacePoint(PI / 4, centerSurfacePoint, Sqrt(bigFloat(2)*halfSideLength*halfSideLength));
-		vec3 ptUL_down = downscale(pt_UL);
+		double_vec_ refPt;
+		vec3 ptUL_down = downscale(pt_UL); //point at vertices[LRindex]
+		vec3 temp;
 
 		//generate base of the square, vertices (LRindex+1-terrainNum) -> LRindex
-		vertices[LRindex] = pt_UL;
-		for (int i = 1; i < terrainNum; i++) {
-			vertices[LRindex - i] = calcSurfacePoint(0, vertices[LRindex - (i - 1)], PLANET_RADIUS);
-		}
+		//vertices[LRindex] = pt_UL;
+		vertices[LRindex] = ptUL_down.x;
+		vertices[LRindex+1] = ptUL_down.y;
+		vertices[LRindex+2] = ptUL_down.z;
+		//for (int i = 3; i < terrainNum*3; i+=3) {
+		//	refPt = double_vec_(vertices[LRindex - (i - 3)], vertices[LRindex - (i - 4)], vertices[LRindex - (i - 5)]);
+		//	temp = calcSurfacePoint(0, refPt, sideLength).downScale();
+		//	vertices[LRindex - i] = temp.x;
+		//	vertices[LRindex - (i + 1)] = temp.y;
+		//	vertices[LRindex - (i + 2)] = temp.z;
+		//	//vertices[LRindex - i] = calcSurfacePoint(0, vertices[LRindex - (i - 1)], sideLength);
+		//}
 
 		//create the rest of the upper left square of base points
-		for (int j = 0; j < terrainNum; j++) {
-			for (int k = 1; k < terrainNum; k++) {
-				vertices[(LRindex - j) - (terrainNum*k)] = calcSurfacePoint(PI/2, vertices[LRindex - j], PLANET_RADIUS);
+		for (int j = 3; j < terrainNum*3; j+=3) {
+			refPt = double_vec_(vertices[LRindex - (j - 3)], vertices[LRindex - (j - 4)], vertices[LRindex - (j - 5)]);
+			temp = downScale(calcSurfacePoint(0, refPt, sideLength));
+			vertices[LRindex - j] = temp.x;
+			vertices[LRindex - (j + 1)] = temp.y;
+			vertices[LRindex - (j + 2)] = temp.z;
+			for (int k = 3; k < terrainNum*3; k+=3) {
+				int tempIndex = (LRindex - j) - (k*(terrainNum - 1));
+				temp = downscale(calcSurfacePoint(PI / 2, double_vec_(vertices[tempIndex - j], vertices[tempIndex + 1], vertices[tempIndex + 2]), sideLength));
+				vertices[(LRindex - j) - (meshWidth*k)] = temp.x;
+				vertices[(LRindex - j + 1) - (meshWidth*k)] = temp.y;
+				vertices[(LRindex - j + 2) - (meshWidth*k)] = temp.z;
+				//vertices[(LRindex - j) - (meshWidth*k)] = calcSurfacePoint(PI/2, vertices[(LRindex - j) - (k*(terrainNum-1))], sideLength);
 			}
 		}
 
-		//TODO transform base points and inbetween points to {x, y, z} VBO
-		const int VBOsize = bufferSize * 3 * LODnum;
-		GLfloat * VBOvertices = new GLfloat[VBOsize];
+		//mirror points across verticle
+		double_vec_ planeNormal = calcSurfaceNormalTriangle(myCam.getPos(), planetCenter, extPointVertN);
+		double_vec_ planeNormal_normalized = planeNormal;
+		planeNormal_normalized.normalize();
+		for (int i = 0; i < halfMeshWidth * meshWidth * 3; i += meshWidth*3) {
+			for (int k = i + (meshWidth * 3) - 3; k >= i + halfMeshWidth * 3; k -= 3) {
+				for (int j = i; j < i + halfMeshWidth * 3; j += 3) {
+					bigFloat dist = distanceFromPlane(double_vec_(vertices[j], vertices[j + 1], vertices[j + 2]), planeNormal);
+					cout << "dist: " << dist.ToFloat() << endl;
 
-		//TODO mirror points
+					vertices[k] = vertices[j] + -1*(dist.ToFloat() * planeNormal_normalized.x.ToFloat()) * 2;
+					vertices[k+1] = vertices[j+1] + -1 * (dist.ToFloat() * planeNormal_normalized.y.ToFloat()) * 2;
+					vertices[k+2] = vertices[j+2] + -1 * (dist.ToFloat() * planeNormal_normalized.z.ToFloat()) * 2;
+				}
+			}
+		}
+
+		//mirror points across horizantle
+		planeNormal = planeNormal_normalized = calcSurfaceNormalTriangle(myCam.getPos(), planetCenter, extPointHorzW);
+		planeNormal_normalized.normalize();
+		for (int i = 0; i < halfMeshWidth * meshWidth * 3; i += meshWidth * 3) {
+			int k = meshWidth * (meshWidth - 1) * 3 - i;
+				for (int j = 0; j < i + meshWidth*3; j+=3) {
+					bigFloat dist = distanceFromPlane(double_vec_(vertices[j], vertices[j + 1], vertices[j + 2]), planeNormal);
+					cout << "dist: " << dist.ToFloat() << endl;
+					
+					vertices[j+k] = vertices[i+j] + -1 * (dist.ToFloat() * planeNormal_normalized.x.ToFloat()) * 2;
+					vertices[j+k+1] = vertices[i+j+1] + -1 * (dist.ToFloat() * planeNormal_normalized.y.ToFloat()) * 2;
+					vertices[j+k+2] = vertices[i+j+2] + -1 * (dist.ToFloat() * planeNormal_normalized.z.ToFloat()) * 2;
+				}
+		}
 
 		//actually memcopy the data - only do this once
-		glBufferData(GL_ARRAY_BUFFER, sizeof(VBOvertices), VBOvertices, GL_DYNAMIC_DRAW);
+		//glBufferData(GL_ARRAY_BUFFER, sizeof(VBOvertices), VBOvertices, GL_DYNAMIC_DRAW);
+		//glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
 
 		//memory cleanup/management
-		delete VBOvertices;
-		delete vertices;
+		//delete VBOvertices;
+
+		//for debug
+		for (int i = 0; i < vertexBufferSize; i++) {
+			cout << "vert buffer pos" << i << ": " << vertices[i] << endl;
+		}
+		cout << "size of vert buffer: " << vertexBufferSize << endl;
+
+		return vertices;
+		//delete vertices;
 	}
 
 	//recreate indexbuffer based on LOD and terrain level
-	void generateMeshIndex() {
-		glGenBuffers(1, &IndexBufferID);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IndexBufferID);
-		const int bufferSize = terrainNum * terrainNum * LODnum * 6;
-		GLuint * elements = new GLuint[bufferSize];
-
-		/*for (int i = 0; i < (terrainWidth - 1) * (terrainDepth - 1) * 6; i += 6) {
-			indexBuff[i] = index;
-			indexBuff[i + 1] = index + 1;
-			indexBuff[i + 2] = index + terrainWidth;
-
-			indexBuff[i + 3] = index + terrainWidth;
-			indexBuff[i + 4] = index + terrainWidth + 1;
-			indexBuff[i + 5] = index + 1;
-
-			if (index % ((int)terrainWidth * row - 2) == 0 && index != 0) {
-				index += 2;
-				row++;
-			}
-
-			else
-				index++;
-		}*/
+	GLuint * generateMeshIndex(GLuint * elements) {
+		//glGenBuffers(1, &IndexBufferID);
+		//glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IndexBufferID);
+		terrainWidth = terrainNum * 2;
+		indexBufferSize = pow(terrainWidth - 1, 2) * 6;
+		delete elements;
+		elements = new GLuint[indexBufferSize];
 
 		//generate index buffer
-		int ind = 0;
-		for (int i = 0; i < bufferSize; i += 6, ind += 6) {
+		int ind = 0, row = 1;
+		for (int i = 0; i < indexBufferSize; i += 6, ind++) {
 			elements[i + 0] = ind;
 			elements[i + 1] = ind + 1;
 			elements[i + 2] = ind + terrainNum * 2;
@@ -568,40 +575,31 @@ public:
 			elements[i + 3] = ind + terrainNum * 2;
 			elements[i + 4] = ind + terrainNum * 2 + 1;
 			elements[i + 5] = ind + 1;
+
+			//todo: fix, triggers in wrong place
+			if ((terrainWidth - 1) * row == (ind + 1)) {
+				ind++;
+				row++;
+			}
 		}
 
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(elements), elements, GL_DYNAMIC_DRAW);
-		glBindVertexArray(0);
-		delete elements;
+		//glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(elements), elements, GL_DYNAMIC_DRAW);
+		//glBindVertexArray(0);
+
+		//for debug
+		for (int i = 0; i < indexBufferSize; i++) {
+			cout << "index buffer pos" << i << ": " << elements[i] << endl;
+		}
+		cout << "size of index buffer: " << indexBufferSize << endl;
+
+		return elements;
+		//delete elements;
 	}
 
-	void updateMesh() {
-		generateMesh();
-		updateMesh();
-	}
-
-	void updateGeom() {
-		/*glBindBuffer(GL_ARRAY_BUFFER, VertexBufferID);
-		buildVertexBufferProcedural(vertexBufferData);
-
-		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertexBufferData), &vertexBufferData);*/
-
-		glBindBuffer(GL_ARRAY_BUFFER, VertexBufferID);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(vertexBufferData), NULL, GL_DYNAMIC_DRAW);
-
-		buildVertexBufferProcedural(vertexBufferData);
-
-		//glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertexBufferData), &vertexBufferData);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(vertexBufferData), vertexBufferData, GL_DYNAMIC_DRAW);
-
-		// get pointer
-		//void *ptr = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
-		//buildVertexBufferProcedural(vertexBufferData);
-
-		//// now copy data into memory
-		//memcpy(ptr, vertexBufferData, sizeof(vertexBufferData));
-		//// make sure to tell OpenGL we're done with the pointer
-		//glUnmapBuffer(GL_ARRAY_BUFFER);
+	//change input vertices and elements pointer to update different meshes
+	void updateMesh(GLfloat * vertices, GLuint * elements) {
+		vertices = generateMesh(vertices);
+		elements = generateMeshIndex(elements);
 	}
 
 	//initialize meshes, VAO, VBO
@@ -619,11 +617,22 @@ public:
 		//set the current state to focus on our vertex buffer
 		glBindBuffer(GL_ARRAY_BUFFER, VertexBufferID);
 
-		buildVertexBufferProcedural(vertexBufferData);
-		//generateMesh();
-
+		//oriantation looking from planet center towards camera
+		extPointHorzW = calcSurfacePoint(PI, myCam.getPos() - planetCenter, halfSideLength);
+		extPointHorzE = calcSurfacePoint(0, myCam.getPos() - planetCenter, halfSideLength);
+		extPointVertN = calcSurfacePoint(PI / 2, myCam.getPos() - planetCenter, halfSideLength);
+		extPointVertS = calcSurfacePoint(3 * PI / 2, myCam.getPos() - planetCenter, halfSideLength);
+		//buildVertexBufferProcedural(vertexBufferData);
+		
+		vertexBufferData = generateMesh(vertexBufferData);
+		/*cout << "in initgeom()"<< endl;
+		for (int i = 0; i < 12; i++) {
+			cout << "vert buffer pos" << i << ": " << vertexBufferData[i] << endl;
+		}
+		cout << "size of vert buffer: " << sizeof(vertexBufferData) << endl;
+		*/
 		//actually memcopy the data - only do this once
-		glBufferData(GL_ARRAY_BUFFER, sizeof(vertexBufferData), vertexBufferData, GL_DYNAMIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(vertexBufferData)*vertexBufferSize, vertexBufferData, GL_DYNAMIC_DRAW);
 
 		//we need to set up the vertex array
 		glEnableVertexAttribArray(0);
@@ -634,8 +643,15 @@ public:
 		glGenBuffers(1, &IndexBufferID);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IndexBufferID);
 
-		buildIndexBuffer(indexBufferData);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indexBufferData), indexBufferData, GL_DYNAMIC_DRAW);
+		//buildIndexBuffer(indexBufferData);
+		indexBufferData = generateMeshIndex(indexBufferData);
+		/*cout << "in initGeom()" << endl;
+		for (int i = 0; i < 6; i++) {
+			cout << "index buffer pos" << i << ": " << indexBufferData[i] << endl;
+		}
+		cout << "size of index buffer: " << sizeof(indexBufferData) << endl;
+		*/
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indexBufferData)*indexBufferSize, indexBufferData, GL_DYNAMIC_DRAW);
 		glBindVertexArray(0);
 	}
 
@@ -668,13 +684,22 @@ public:
 
 	//draw everything
 	void render() {
-		if (myCam.moved) {
-			updateGeom();
-		}
-
 		static double count = 0;
 		double frametime = get_last_elapsed_time();
 		count += frametime;
+
+		//if the mesh is too small, resize it
+		//todo, uncomment and test on shit appears
+		/*int horizonNum = checkHorizon();
+		if (horizonNum == 2) {
+			terrainNum++;
+			updateMesh(vertexBufferData, indexBufferData);
+		}
+
+		else if (horizonNum == 1 && terrainNum > 1) {
+			terrainNum--;
+			updateMesh(vertexBufferData, indexBufferData);
+		}*/
 
 		//TEST code for camera tests
 		// Get current frame buffer size.
@@ -703,6 +728,8 @@ public:
 
 		Model->pushMatrix();
 		//Model->translate(vec3(myCam.getPos().x.ToFloat(), myCam.getPos().y.ToFloat(), myCam.getPos().z.ToFloat()));
+		//Model->rotate(-myCam.getRot().x, vec3(1, 0, 0));
+		//Model->rotate(-myCam.getRot().y, vec3(0, 1, 0));
 
 		//Draw our scene - two meshes - right now to a texture
 		prog->bind();
@@ -713,24 +740,14 @@ public:
 		glBindVertexArray(VertexArrayID);
 
 		//draw triangles
-		glDrawElements(GL_TRIANGLES, sizeof(indexBufferData), GL_UNSIGNED_INT, nullptr);
-
-		if (myCam.moved) {
-			cout << "VBO after draw" << endl;
-			printf("cam pos {%f, %f, %f}\n", myCam.getPos().x.ToFloat(), myCam.getPos().y.ToFloat(), myCam.getPos().z.ToFloat());
-			cout << vertexBufferData[0] << endl;
-			cout << vertexBufferData[1] << endl;
-			cout << vertexBufferData[2] << endl;
-			cout << vertexBufferData[3] << endl;
-			cout << vertexBufferData[4] << endl;
-			cout << vertexBufferData[5] << endl;
-			cout << vertexBufferData[6] << endl;
-			cout << vertexBufferData[7] << endl;
-			cout << vertexBufferData[8] << endl;
-			cout << vertexBufferData[9] << endl;
-			cout << vertexBufferData[10] << endl;
-			cout << vertexBufferData[11] << endl << endl;
+		/*for (int i = 0; i < 12; i++) {
+			cout << vertexBufferData[i] << endl;
 		}
+		for (int i = 0; i < 6; i++) {
+			cout << indexBufferData[i] << endl;
+		}*/
+		//use GL_TRIANGLE to draw everything filled in
+		glDrawElements(GL_LINE_STRIP, sizeof(indexBufferData)*indexBufferSize, GL_UNSIGNED_INT, nullptr);
 
 		glBindVertexArray(0);
 
@@ -759,7 +776,7 @@ int main(int argc, char **argv) {
 	// may need to initialize or set up different data and state
 
 	application->init(resourceDir);
-	application->initGeom();
+	//application->initGeom();
 
 	// Loop until the user closes the window.
 	while (!glfwWindowShouldClose(windowManager->getHandle()))
