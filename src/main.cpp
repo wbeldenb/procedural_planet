@@ -133,7 +133,7 @@ private:
 	//lengh of any side on the planet equator
 	const bigFloat sideLength = planetCircum / numSides;
 	const bigFloat halfSideLength = sideLength / 2;
-	//factor to determine number of base points, equal to one quarter of total mesh points
+	//factor to determine number of base points, equal to one quarter of total mesh points, numSides / 4
 	int terrainNum = 2;
 	//factor to determine LOD mesh simplification
 	int LODnum = 1;
@@ -467,45 +467,48 @@ public:
 		centerSurfacePoint = calcCenterSurfacePt();
 		vec3 pt_down = downscale(centerSurfacePoint);
 
-		//lower righthand point of the generated square
-		const int LRindex = (terrainNum * meshWidth - (terrainNum + 1)) * 3;
+		//lower righthand index of the generated square
+		const int LRindex = ((meshWidth*meshWidth)/2 - (terrainNum + 1)) * 3;
 		
 		//calculate upper left point from the center point, the lower righthand point of the generated square
 		double_vec_ pt_UL = calcSurfacePoint(PI / 4, centerSurfacePoint, Sqrt(bigFloat(2)*halfSideLength*halfSideLength));
 		double_vec_ refPt;
 		vec3 ptUL_down = downscale(pt_UL); //point at vertices[LRindex]
 		vec3 temp;
+		int index;
 
-		//generate base of the square, vertices (LRindex+1-terrainNum) -> LRindex
-		//vertices[LRindex] = pt_UL;
+		//generate base first point of the upper left square, at index Lower Right (LRindex)
 		vertices[LRindex] = ptUL_down.x;
 		vertices[LRindex+1] = ptUL_down.y;
 		vertices[LRindex+2] = ptUL_down.z;
-		//for (int i = 3; i < terrainNum*3; i+=3) {
-		//	refPt = double_vec_(vertices[LRindex - (i - 3)], vertices[LRindex - (i - 4)], vertices[LRindex - (i - 5)]);
-		//	temp = calcSurfacePoint(0, refPt, sideLength).downScale();
-		//	vertices[LRindex - i] = temp.x;
-		//	vertices[LRindex - (i + 1)] = temp.y;
-		//	vertices[LRindex - (i + 2)] = temp.z;
-		//	//vertices[LRindex - i] = calcSurfacePoint(0, vertices[LRindex - (i - 1)], sideLength);
-		//}
 
-		//create the rest of the upper left square of base points
-		for (int j = 3; j < terrainNum*3; j+=3) {
-			refPt = double_vec_(vertices[LRindex - (j - 3)], vertices[LRindex - (j - 4)], vertices[LRindex - (j - 5)]);
-			temp = downScale(calcSurfacePoint(0, refPt, sideLength));
-			vertices[LRindex - j] = temp.x;
-			vertices[LRindex - (j + 1)] = temp.y;
-			vertices[LRindex - (j + 2)] = temp.z;
-			for (int k = 3; k < terrainNum*3; k+=3) {
-				int tempIndex = (LRindex - j) - (k*(terrainNum - 1));
-				temp = downscale(calcSurfacePoint(PI / 2, double_vec_(vertices[tempIndex - j], vertices[tempIndex + 1], vertices[tempIndex + 2]), sideLength));
-				vertices[(LRindex - j) - (meshWidth*k)] = temp.x;
-				vertices[(LRindex - j + 1) - (meshWidth*k)] = temp.y;
-				vertices[(LRindex - j + 2) - (meshWidth*k)] = temp.z;
-				//vertices[(LRindex - j) - (meshWidth*k)] = calcSurfacePoint(PI/2, vertices[(LRindex - j) - (k*(terrainNum-1))], sideLength);
+		//create upper left of mesh lattice if it is greater than one vertex
+		if (LRindex > 0) {
+			//create bottom horizantle branch of mesh points, starting with LRindex and working left towards the edge
+			for (int i = 3; i < terrainNum * 3; i += 3) {
+				index = LRindex - i;
+				refPt = double_vec_(vertices[index + 3], vertices[index + 4], vertices[index + 5]);
+				temp = downScale(calcSurfacePoint(0, refPt, sideLength));
+				vertices[index] = temp.x;
+				vertices[index + 1] = temp.y;
+				vertices[index + 2] = temp.z;
+			}
+
+			//create vertical branches of each vertex of the horizantel lattice branch
+			for (int j = 0; j < terrainNum * 3; j += 3) {
+				index = LRindex - j;
+				refPt = double_vec_(vertices[index], vertices[index + 1], vertices[index + 2]);
+				for (int k = meshWidth*3; k < meshWidth*terrainNum*3; k += meshWidth*3) {
+					temp = downscale(calcSurfacePoint(PI / 2, double_vec_(vertices[index], vertices[index + 1], vertices[index + 2]), sideLength));
+					index -= meshWidth * 3;
+					vertices[index] = temp.x;
+					vertices[index + 1] = temp.y;
+					vertices[index + 2] = temp.z;
+				}
 			}
 		}
+
+		//todo: mirroring wrong, repeating copying of certain vertices
 
 		//mirror points across verticle
 		double_vec_ planeNormal = calcSurfaceNormalTriangle(myCam.getPos(), planetCenter, extPointVertN);
@@ -515,7 +518,7 @@ public:
 			for (int k = i + (meshWidth * 3) - 3; k >= i + halfMeshWidth * 3; k -= 3) {
 				for (int j = i; j < i + halfMeshWidth * 3; j += 3) {
 					bigFloat dist = distanceFromPlane(double_vec_(vertices[j], vertices[j + 1], vertices[j + 2]), planeNormal);
-					cout << "dist: " << dist.ToFloat() << endl;
+					//cout << "dist: " << dist.ToFloat() << endl;
 
 					vertices[k] = vertices[j] + -1*(dist.ToFloat() * planeNormal_normalized.x.ToFloat()) * 2;
 					vertices[k+1] = vertices[j+1] + -1 * (dist.ToFloat() * planeNormal_normalized.y.ToFloat()) * 2;
@@ -531,7 +534,7 @@ public:
 			int k = meshWidth * (meshWidth - 1) * 3 - i;
 				for (int j = 0; j < i + meshWidth*3; j+=3) {
 					bigFloat dist = distanceFromPlane(double_vec_(vertices[j], vertices[j + 1], vertices[j + 2]), planeNormal);
-					cout << "dist: " << dist.ToFloat() << endl;
+					//cout << "dist: " << dist.ToFloat() << endl;
 					
 					vertices[j+k] = vertices[i+j] + -1 * (dist.ToFloat() * planeNormal_normalized.x.ToFloat()) * 2;
 					vertices[j+k+1] = vertices[i+j+1] + -1 * (dist.ToFloat() * planeNormal_normalized.y.ToFloat()) * 2;
@@ -566,18 +569,17 @@ public:
 		elements = new GLuint[indexBufferSize];
 
 		//generate index buffer
-		int ind = 0, row = 1;
+		int ind = 0, skipIndex = terrainWidth-1, row = 1;
 		for (int i = 0; i < indexBufferSize; i += 6, ind++) {
 			elements[i + 0] = ind;
 			elements[i + 1] = ind + 1;
-			elements[i + 2] = ind + terrainNum * 2;
+			elements[i + 2] = ind + terrainWidth;
 
-			elements[i + 3] = ind + terrainNum * 2;
-			elements[i + 4] = ind + terrainNum * 2 + 1;
+			elements[i + 3] = ind + terrainWidth;
+			elements[i + 4] = ind + terrainWidth + 1;
 			elements[i + 5] = ind + 1;
 
-			//todo: fix, triggers in wrong place
-			if ((terrainWidth - 1) * row == (ind + 1)) {
+			if (ind % ((int)terrainWidth * row - 2) == 0 && ind != 0) {
 				ind++;
 				row++;
 			}
