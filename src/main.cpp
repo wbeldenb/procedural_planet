@@ -26,7 +26,7 @@ using namespace glm;
 using namespace ttmath;
 
 //planet constant for easy changing
-#define PLANET_RADIUS 1000
+#define PLANET_RADIUS 7000
 
 //calculate time offsets
 double get_last_elapsed_time() {
@@ -68,7 +68,7 @@ public:
 	mat4 process(double fTime) {
 		float speedFB = 0;
 		float speedLR = 0;
-		float fwdspeed = 45;
+		float fwdspeed = 50;
 
 		if (w)
 			speedFB = fwdspeed * fTime;
@@ -121,6 +121,7 @@ private:
 	////////////////////
 	//planet constants//
 	////////////////////
+	uint DRAW_MODE = GL_TRIANGLE_STRIP;
 	const double_vec_ planetCenter = double_vec_(0, 0, -(PLANET_RADIUS + 100));
 	//extreme point for LOD refactor testing
 	double_vec_ extPointVertN, extPointVertS, extPointHorzE, extPointHorzW;
@@ -134,7 +135,7 @@ private:
 	const bigFloat sideLength = planetCircum / numSides;
 	const bigFloat halfSideLength = sideLength / 2;
 	//factor to determine number of base points, equal to one quarter of total mesh points, numSides / 4
-	int terrainNum = 2;
+	int terrainNum = 4;
 	//factor to determine LOD mesh simplification
 	int LODnum = 1;
 	//center point between planet center and the camera
@@ -254,6 +255,28 @@ public:
 			myCam.a = false;
 		}
 
+		else if (key == GLFW_KEY_T && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
+			DRAW_MODE = GL_TRIANGLE_STRIP;
+		}
+
+		else if (key == GLFW_KEY_Y && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
+			DRAW_MODE = GL_LINE_STRIP;
+		}
+
+		else if (key == GLFW_KEY_G && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
+			if (terrainNum < 26) {
+				terrainNum++;
+				indexBufferData = updateMesh(vertexBufferData, indexBufferData);
+			}
+		}
+
+		else if (key == GLFW_KEY_H && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
+			if (terrainNum > 2) {
+				terrainNum--;
+				indexBufferData = updateMesh(vertexBufferData, indexBufferData);
+			}
+		}
+
 		//disable movement on key release
 		if (key == GLFW_KEY_W && action == GLFW_RELEASE)
 			myCam.w = myCam.moved = false;
@@ -274,12 +297,22 @@ public:
 	int checkHorizon() {
 		//calculate hypotenuse of right triangle formed by camera, planet center, and farthest visible point on horizon
 		//the lengths of the sides being the the altitude of the camera(h), the planet radius, and len (unknown)
-		float h = distance_vec(myCam.getPos(), planetCenter).ToFloat() - PLANET_RADIUS;
+		float h = Abs(distance_vec(-1.f*myCam.getPos(), planetCenter)).ToFloat() - PLANET_RADIUS;
 		//the length from the camera to the farthest visible point on the horizon (rendered or not)
 		float len = sqrt(h*(2*PLANET_RADIUS + h));
+		//float h2 = Abs(distance_vec(myCam.getPos(), calcCenterSurfacePt())).ToFloat();
 
-		if (distance_vec(myCam.getPos(), extPointVertN) - sideLength > bigFloat(len))
+		if (distance_vec(myCam.getPos(), extPointVertN) - sideLength > bigFloat(len)) {
+			//cout << "camPosz: " << myCam.getPos().z.ToFloat() << endl;
+			//cout << "planetPosz: " << planetCenter.z.ToFloat() << endl;
+			//cout << "h: " << h << endl;
+			////cout << "h2: " << h2 << endl;
+
+			//cout << "len to horz: " << len << endl;
+			//cout << "dist to ext: " << (distance_vec(myCam.getPos(), extPointVertN) - sideLength).ToFloat() << endl;
+			//cout << endl;
 			return 1;
+		}
 		
 		else if (distance_vec(myCam.getPos(), extPointVertS) - sideLength > bigFloat(len))
 			return 1;
@@ -290,8 +323,17 @@ public:
 		else if (distance_vec(myCam.getPos(), extPointHorzE) - sideLength > bigFloat(len))
 			return 1;
 
-		else if (distance_vec(myCam.getPos(), extPointVertN) < bigFloat(len))
+		else if (distance_vec(myCam.getPos(), extPointVertN) < bigFloat(len)) {
+			//cout << "camPosz: " << myCam.getPos().z.ToFloat() << endl;
+			//cout << "planetPosz: " <<planetCenter.z.ToFloat() << endl;
+			//cout << "h: " << h << endl;
+			////cout << "h2: " << h2 << endl;
+
+			//cout << "len to horz: " << len << endl;
+			//cout << "dist to ext: " << distance_vec(myCam.getPos(), extPointVertN).ToFloat() << endl;
+			//cout << endl;
 			return 2;
+		}
 
 		else if (distance_vec(myCam.getPos(), extPointVertS) < bigFloat(len))
 			return 2;
@@ -322,7 +364,7 @@ public:
 		const double_vec_ pCenter = planetCenter;
 
 		//calculate parametric value: u
-		const bigFloat d = distance_vec(pos, pCenter);
+		const bigFloat d = Abs(distance_vec(pos, pCenter));
 		const bigFloat u = bigFloat(PLANET_RADIUS) / d;
 
 		//calculate surface position: surfacePt
@@ -445,10 +487,9 @@ public:
 		const int meshWidth = terrainNum * 2;
 		const int halfMeshWidth = terrainNum;
 
-		//calc extreme points, initially calculated in initGeom()
+		//calc new extreme points, initially calculated in initGeom()
 		extPointVertN = calcSurfacePoint(PI / 2, extPointVertN, sideLength);
 		extPointVertS = calcSurfacePoint(3 * PI / 2, extPointVertS, sideLength);
-
 		extPointHorzW = calcSurfacePoint(PI, extPointHorzW, sideLength);
 		extPointHorzE = calcSurfacePoint(0, extPointHorzE, sideLength);
 
@@ -464,7 +505,7 @@ public:
 		vertices = new float[vertexBufferSize];
 
 		//calculate new center point
-		centerSurfacePoint = calcCenterSurfacePt();
+		//centerSurfacePoint = calcCenterSurfacePt();
 		vec3 pt_down = downscale(centerSurfacePoint);
 
 		//lower righthand index of the generated square
@@ -492,6 +533,11 @@ public:
 				vertices[index] = temp.x;
 				vertices[index + 1] = temp.y;
 				vertices[index + 2] = temp.z;
+
+				extPointVertN = calcSurfacePoint(PI / 2, extPointVertN, sideLength);
+				extPointVertS = calcSurfacePoint(3 * PI / 2, extPointVertS, sideLength);
+				extPointHorzW = calcSurfacePoint(PI, extPointHorzW, sideLength);
+				extPointHorzE = calcSurfacePoint(0, extPointHorzE, sideLength);
 			}
 
 			//create vertical branches of each vertex of the horizantel lattice branch
@@ -515,15 +561,18 @@ public:
 		double_vec_ planeNormal_normalized = planeNormal;
 		planeNormal_normalized.normalize();
 		for (int i = 0; i < halfMeshWidth * meshWidth * 3; i += meshWidth*3) {
+			int j = i;
 			for (int k = i + (meshWidth * 3) - 3; k >= i + halfMeshWidth * 3; k -= 3) {
-				for (int j = i; j < i + halfMeshWidth * 3; j += 3) {
+				//for (int j = i; j < i + halfMeshWidth * 3; j += 3) {
 					bigFloat dist = distanceFromPlane(double_vec_(vertices[j], vertices[j + 1], vertices[j + 2]), planeNormal);
 					//cout << "dist: " << dist.ToFloat() << endl;
 
 					vertices[k] = vertices[j] + -1*(dist.ToFloat() * planeNormal_normalized.x.ToFloat()) * 2;
 					vertices[k+1] = vertices[j+1] + -1 * (dist.ToFloat() * planeNormal_normalized.y.ToFloat()) * 2;
 					vertices[k+2] = vertices[j+2] + -1 * (dist.ToFloat() * planeNormal_normalized.z.ToFloat()) * 2;
-				}
+
+					j += 3;
+				//}
 			}
 		}
 
@@ -532,8 +581,8 @@ public:
 		planeNormal_normalized.normalize();
 		for (int i = 0; i < halfMeshWidth * meshWidth * 3; i += meshWidth * 3) {
 			int k = meshWidth * (meshWidth - 1) * 3 - i;
-				for (int j = 0; j < i + meshWidth*3; j+=3) {
-					bigFloat dist = distanceFromPlane(double_vec_(vertices[j], vertices[j + 1], vertices[j + 2]), planeNormal);
+				for (int j = 0; j < meshWidth*3; j+=3) {
+					bigFloat dist = distanceFromPlane(double_vec_(vertices[j + i], vertices[j + i + 1], vertices[j + i + 2]), planeNormal);
 					//cout << "dist: " << dist.ToFloat() << endl;
 					
 					vertices[j+k] = vertices[i+j] + -1 * (dist.ToFloat() * planeNormal_normalized.x.ToFloat()) * 2;
@@ -550,10 +599,10 @@ public:
 		//delete VBOvertices;
 
 		//for debug
-		for (int i = 0; i < vertexBufferSize; i++) {
+		/*for (int i = 0; i < vertexBufferSize; i++) {
 			cout << "vert buffer pos" << i << ": " << vertices[i] << endl;
 		}
-		cout << "size of vert buffer: " << vertexBufferSize << endl;
+		cout << "size of vert buffer: " << vertexBufferSize << endl;*/
 
 		return vertices;
 		//delete vertices;
@@ -565,7 +614,7 @@ public:
 		//glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IndexBufferID);
 		terrainWidth = terrainNum * 2;
 		indexBufferSize = pow(terrainWidth - 1, 2) * 6;
-		delete elements;
+		//delete elements;
 		elements = new GLuint[indexBufferSize];
 
 		//generate index buffer
@@ -589,19 +638,54 @@ public:
 		//glBindVertexArray(0);
 
 		//for debug
-		for (int i = 0; i < indexBufferSize; i++) {
+		/*for (int i = 0; i < indexBufferSize; i++) {
 			cout << "index buffer pos" << i << ": " << elements[i] << endl;
 		}
-		cout << "size of index buffer: " << indexBufferSize << endl;
+		cout << "size of index buffer: " << indexBufferSize << endl;*/
 
 		return elements;
 		//delete elements;
 	}
 
 	//change input vertices and elements pointer to update different meshes
-	void updateMesh(GLfloat * vertices, GLuint * elements) {
+	GLuint * updateMesh(GLfloat * vertices, GLuint * elements) {
+		//generate the VAO
+		glGenVertexArrays(1, &VertexArrayID);
+		glBindVertexArray(VertexArrayID);
+
+		//generate vertex buffer to hand off to OGL
+		glGenBuffers(1, &VertexBufferID);
+		//set the current state to focus on our vertex buffer
+		glBindBuffer(GL_ARRAY_BUFFER, VertexBufferID);
+
+		/*extPointHorzW = calcSurfacePoint(PI, myCam.getPos() - planetCenter, halfSideLength);
+		extPointHorzE = calcSurfacePoint(0, myCam.getPos() - planetCenter, halfSideLength);
+		extPointVertN = calcSurfacePoint(PI / 2, myCam.getPos() - planetCenter, halfSideLength);
+		extPointVertS = calcSurfacePoint(3 * PI / 2, myCam.getPos() - planetCenter, halfSideLength);*/
+		centerSurfacePoint = calcCenterSurfacePt();
+		extPointHorzW = calcSurfacePoint(PI, centerSurfacePoint, halfSideLength);
+		extPointHorzE = calcSurfacePoint(0, centerSurfacePoint, halfSideLength);
+		extPointVertN = calcSurfacePoint(PI / 2, centerSurfacePoint, halfSideLength);
+		extPointVertS = calcSurfacePoint(3 * PI / 2, centerSurfacePoint, halfSideLength);
+
+		//todo: change updating of extreme points so they expand and contract as mesh does (currently keep reseting to default)
+
 		vertices = generateMesh(vertices);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices)*vertexBufferSize, vertices, GL_DYNAMIC_DRAW);
+
+		//we need to set up the vertex array
+		glEnableVertexAttribArray(0);
+		//key function to get up how many elements to pull out at a time (3)
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+
+		// Create and bind IBO
+		glGenBuffers(1, &IndexBufferID);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IndexBufferID);
 		elements = generateMeshIndex(elements);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(elements)*indexBufferSize, elements, GL_DYNAMIC_DRAW);
+		glBindVertexArray(0);
+
+		return elements;
 	}
 
 	//initialize meshes, VAO, VBO
@@ -620,10 +704,11 @@ public:
 		glBindBuffer(GL_ARRAY_BUFFER, VertexBufferID);
 
 		//oriantation looking from planet center towards camera
-		extPointHorzW = calcSurfacePoint(PI, myCam.getPos() - planetCenter, halfSideLength);
-		extPointHorzE = calcSurfacePoint(0, myCam.getPos() - planetCenter, halfSideLength);
-		extPointVertN = calcSurfacePoint(PI / 2, myCam.getPos() - planetCenter, halfSideLength);
-		extPointVertS = calcSurfacePoint(3 * PI / 2, myCam.getPos() - planetCenter, halfSideLength);
+		centerSurfacePoint = calcCenterSurfacePt();
+		extPointHorzW = calcSurfacePoint(PI, centerSurfacePoint, halfSideLength);
+		extPointHorzE = calcSurfacePoint(0, centerSurfacePoint, halfSideLength);
+		extPointVertN = calcSurfacePoint(PI / 2, centerSurfacePoint, halfSideLength);
+		extPointVertS = calcSurfacePoint(3 * PI / 2, centerSurfacePoint, halfSideLength);
 		//buildVertexBufferProcedural(vertexBufferData);
 		
 		vertexBufferData = generateMesh(vertexBufferData);
@@ -647,12 +732,12 @@ public:
 
 		//buildIndexBuffer(indexBufferData);
 		indexBufferData = generateMeshIndex(indexBufferData);
-		/*cout << "in initGeom()" << endl;
-		for (int i = 0; i < 6; i++) {
+		//cout << "in initGeom()" << endl;
+		/*for (int i = 0; i < 6; i++) {
 			cout << "index buffer pos" << i << ": " << indexBufferData[i] << endl;
 		}
-		cout << "size of index buffer: " << sizeof(indexBufferData) << endl;
-		*/
+		cout << "size of index buffer: " << sizeof(indexBufferData) << endl;*/
+		
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indexBufferData)*indexBufferSize, indexBufferData, GL_DYNAMIC_DRAW);
 		glBindVertexArray(0);
 	}
@@ -692,16 +777,16 @@ public:
 
 		//if the mesh is too small, resize it
 		//todo, uncomment and test on shit appears
-		/*int horizonNum = checkHorizon();
-		if (horizonNum == 2) {
+		int horizonNum = checkHorizon();
+		if (horizonNum == 2 && terrainNum < 26) {
 			terrainNum++;
-			updateMesh(vertexBufferData, indexBufferData);
+			indexBufferData = updateMesh(vertexBufferData, indexBufferData);
 		}
 
-		else if (horizonNum == 1 && terrainNum > 1) {
+		else if (horizonNum == 1 && terrainNum > 2) {
 			terrainNum--;
-			updateMesh(vertexBufferData, indexBufferData);
-		}*/
+			indexBufferData = updateMesh(vertexBufferData, indexBufferData);
+		}
 
 		//TEST code for camera tests
 		// Get current frame buffer size.
@@ -723,7 +808,7 @@ public:
 		auto Model = make_shared<MatrixStack>();
 		// Apply perspective projection.
 		Projection->pushMatrix();
-		Projection->perspective(45, width, height, 0.01f, 1000.0f);
+		Projection->perspective(45, width, height, 0.01f, 1000000);
 
 		//View for fps camera
 		mat4 V = myCam.process(frametime);
@@ -749,7 +834,7 @@ public:
 			cout << indexBufferData[i] << endl;
 		}*/
 		//use GL_TRIANGLE to draw everything filled in
-		glDrawElements(GL_LINE_STRIP, sizeof(indexBufferData)*indexBufferSize, GL_UNSIGNED_INT, nullptr);
+		glDrawElements(DRAW_MODE, sizeof(indexBufferData)*indexBufferSize, GL_UNSIGNED_INT, nullptr);
 
 		glBindVertexArray(0);
 

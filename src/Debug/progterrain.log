@@ -7,8 +7,8 @@ c:\users\belde\desktop\progterrain\src\main.cpp(84): warning C4244: '=': convers
 c:\users\belde\desktop\progterrain\src\main.cpp(86): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
 c:\users\belde\desktop\progterrain\src\main.cpp(90): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
 c:\users\belde\desktop\progterrain\src\main.cpp(92): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
-c:\users\belde\desktop\progterrain\src\main.cpp(208): warning C4305: '=': truncation from 'double' to 'float'
-c:\users\belde\desktop\progterrain\src\main.cpp(212): warning C4305: '=': truncation from 'double' to 'float'
-c:\users\belde\desktop\progterrain\src\main.cpp(567): warning C4244: '=': conversion from 'double' to 'int', possible loss of data
-c:\users\belde\desktop\progterrain\src\main.cpp(726): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+c:\users\belde\desktop\progterrain\src\main.cpp(209): warning C4305: '=': truncation from 'double' to 'float'
+c:\users\belde\desktop\progterrain\src\main.cpp(213): warning C4305: '=': truncation from 'double' to 'float'
+c:\users\belde\desktop\progterrain\src\main.cpp(616): warning C4244: '=': conversion from 'double' to 'int', possible loss of data
+c:\users\belde\desktop\progterrain\src\main.cpp(811): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
   progterrain.vcxproj -> C:\Users\belde\Desktop\progterrain\Debug\progterrain.exe
