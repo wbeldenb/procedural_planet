@@ -26,7 +26,7 @@ using namespace glm;
 using namespace ttmath;
 
 //planet constant for easy changing
-#define PLANET_RADIUS 7000
+#define PLANET_RADIUS 1000
 
 //calculate time offsets
 double get_last_elapsed_time() {
@@ -135,7 +135,7 @@ private:
 	const bigFloat sideLength = planetCircum / numSides;
 	const bigFloat halfSideLength = sideLength / 2;
 	//factor to determine number of base points, equal to one quarter of total mesh points, numSides / 4
-	int terrainNum = 4;
+	int terrainNum = 2;
 	//factor to determine LOD mesh simplification
 	int LODnum = 1;
 	//center point between planet center and the camera
@@ -155,6 +155,76 @@ private:
 	//buffers for terrain generation
 	GLfloat *vertexBufferData;
 	GLuint *indexBufferData;
+
+	//globals for mesh rotations
+	GLfloat rotationTheta = 0.f;
+	double_vec_ rotationAxis = double_vec_(NULL, NULL, NULL);
+
+	//globals for test translation
+	GLint xChange = 0;
+	GLint yChange = 0;
+	GLint zChange = 0;
+
+	//globals for camera movements deltas
+	double_vec_ newCamPos, oldCamPos;
+
+	//harcoded buffer for terrainNum 2 testing
+	//GLuint indexBufferData[54]{
+	//	0,
+	//	1,
+	//	4,
+	//	4,
+	//	5,
+	//	1,
+	//	1,
+	//	2,
+	//	5,
+	//	5,
+	//	6,
+	//	2,
+	//	2,
+	//	3,
+	//	6,
+	//	6,
+	//	7,
+	//	3,
+	//	4,
+	//	5,
+	//	8,
+	//	8,
+	//	9,
+	//	5,
+	//	5,
+	//	6,
+	//	9,
+	//	9,
+	//	10,
+	//	6,
+	//	6,
+	//	7,
+	//	10,
+	//	10,
+	//	11,
+	//	7,
+	//	8,
+	//	9,
+	//	12,
+	//	12,
+	//	13,
+	//	9,
+	//	9,
+	//	10,
+	//	13,
+	//	13,
+	//	14,
+	//	10,
+	//	10,
+	//	11,
+	//	14,
+	//	14,
+	//	15,
+	//	11,
+	//};
 	//globals to store buffer sizes to ensure data is transfered to GPU  correctly
 	int vertexBufferSize = 0, indexBufferSize = 0;
 	//GLfloat vertexBufferData[12] = { 0 };
@@ -175,6 +245,11 @@ public:
 		bigFloat y = u.z * v.x - u.x * v.z;
 		bigFloat z = u.x * v.y - u.y * v.x;
 		return double_vec_(x, y, z);
+	}
+
+	bigFloat dotDouble(double_vec_ v, double_vec_ u) {
+		bigFloat dat = v.x*u.x + v.y*u.y + v.z*u.z;
+		return dat;
 	}
 
 	vec3 downScale(double_vec_ vec) {
@@ -237,26 +312,30 @@ public:
 
 		//forwards backwards movement controls
 		if (key == GLFW_KEY_W && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
+			oldCamPos = myCam.getPos();
 			myCam.w = myCam.moved = true;
 			myCam.s = false;
 		}
 		else if (key == GLFW_KEY_S && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
+			oldCamPos = myCam.getPos();
 			myCam.s = myCam.moved = true;
 			myCam.w = false;
 		}
 
 		//side to side movement controls
 		if (key == GLFW_KEY_A && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
+			oldCamPos = myCam.getPos();
 			myCam.a = myCam.moved = true;
 			myCam.d = false;
 		}
 		else if (key == GLFW_KEY_D && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
+			oldCamPos = myCam.getPos();
 			myCam.d = myCam.moved = true;
 			myCam.a = false;
 		}
 
 		else if (key == GLFW_KEY_T && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-			DRAW_MODE = GL_TRIANGLE_STRIP;
+			DRAW_MODE = GL_TRIANGLES;
 		}
 
 		else if (key == GLFW_KEY_Y && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
@@ -266,16 +345,34 @@ public:
 		else if (key == GLFW_KEY_G && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
 			if (terrainNum < 26) {
 				terrainNum++;
-				indexBufferData = updateMesh(vertexBufferData, indexBufferData);
+				indexBufferData = updateMesh(vertexBufferData, indexBufferData, 2);
 			}
 		}
 
 		else if (key == GLFW_KEY_H && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
 			if (terrainNum > 2) {
 				terrainNum--;
-				indexBufferData = updateMesh(vertexBufferData, indexBufferData);
+				indexBufferData = updateMesh(vertexBufferData, indexBufferData, 1);
 			}
 		}
+
+		else if (key == GLFW_KEY_O && (action == GLFW_PRESS || action == GLFW_REPEAT))
+			xChange += 10;
+
+		else if (key == GLFW_KEY_P && (action == GLFW_PRESS || action == GLFW_REPEAT))
+			xChange -= 10;
+
+		else if (key == GLFW_KEY_K && (action == GLFW_PRESS || action == GLFW_REPEAT))
+			yChange += 10;
+
+		else if (key == GLFW_KEY_L && (action == GLFW_PRESS || action == GLFW_REPEAT))
+			yChange -= 10;
+
+		else if (key == GLFW_KEY_N && (action == GLFW_PRESS || action == GLFW_REPEAT))
+			zChange += 10;
+
+		else if (key == GLFW_KEY_M && (action == GLFW_PRESS || action == GLFW_REPEAT))
+			zChange -= 10;
 
 		//disable movement on key release
 		if (key == GLFW_KEY_W && action == GLFW_RELEASE)
@@ -293,7 +390,7 @@ public:
 	}
 
 	//check to see if the max distance the camera can see extends passed the most extreme point on the generated mesh
-	//return 1 if the mesh needs to be shrunk, 2 if expanded, 3 if fine as is
+	//return 1 if the mesh needs to be shrunk, 2 if expanded, 0 if fine as is
 	int checkHorizon() {
 		//calculate hypotenuse of right triangle formed by camera, planet center, and farthest visible point on horizon
 		//the lengths of the sides being the the altitude of the camera(h), the planet radius, and len (unknown)
@@ -345,7 +442,7 @@ public:
 			return 2;
 
 		else
-			return 3;
+			return 0;
 	}
 
 	//downscale from bigFloat vec3 to float vec3
@@ -420,56 +517,6 @@ public:
 		return A + ACVec;
 	}
 
-	//probably can be moved to graphics card, or maybe generate then pass as uniform
-	////////////////////////////////////////////////////////////////
-	//float getAltitude(float color) {
-	//	float tempHeight = color / 127.5 - 1.0f;
-	//	return tempHeight * maxAltitude;
-	//}
-
-	//float generateHeight(float x, float z, int seed) {
-	//	float total = 0;
-	//	for (int i = 0; i < octaves; i++) {
-	//		float divisor = 8.0 / pow(2, i);
-	//		total += getInterpolatedNoise(x / divisor, z / divisor, seed) * (maxAltitude / pow(3, i));
-	//	}
-	//	return total;
-	//}
-
-	//float getInterpolatedNoise(float x, float z, int seed) {
-	//	int intX = (int)x;
-	//	int intZ = (int)z;
-	//	float fracX = x - intX;
-	//	float fracZ = z - intZ;
-
-	//	float v1 = getSmoothNoise(intX, intZ, seed);
-	//	float v2 = getSmoothNoise(intX + 1, intZ, seed);
-	//	float v3 = getSmoothNoise(intX, intZ + 1, seed);
-	//	float v4 = getSmoothNoise(intX + 1, intZ + 1, seed);
-	//	float i1 = interpolate(v1, v2, fracX);
-	//	float i2 = interpolate(v3, v4, fracX);
-	//	return interpolate(i1, i2, fracZ);
-	//}
-
-	//float interpolate(float a, float b, float blend) {
-	//	double t = blend * PI;
-	//	float f = (float)(1.0 - cos(t)) * 0.5f;
-	//	return a * (1 - f) + b * f;
-	//}
-
-	//float getSmoothNoise(int x, int z, int seed) {
-	//	float corners = (getNoise(x - 1, z - 1, seed) + getNoise(x + 1, z - 1, seed) + getNoise(x - 1, z + 1, seed) + getNoise(x + 1, z + 1, seed)) / 16.0f;
-	//	float sides = (getNoise(x - 1, z, seed) + getNoise(x + 1, z, seed) + getNoise(x, z - 1, seed) + getNoise(x, z + 1, seed)) / 8.0f;
-	//	float center = getNoise(x, z, seed) / 4.0f;
-	//	return corners + sides + center;
-	//}
-
-	//float getNoise(int x, int z, int seed) {
-	//	srand(x * 49632 + z * 325176 + seed);
-	//	return ((float)rand() / RAND_MAX) * 2.0f - 1.0f;
-	//}
-	/////////////////////////////////////////////////////////////////////////
-
 	//calculate the surface normal of a triangle with vertices a, b, c
 	double_vec_ calcSurfaceNormalTriangle(double_vec_ a, double_vec_ b, double_vec_ c) {
 		return crossDouble(b - a, c - a);
@@ -523,13 +570,17 @@ public:
 		vertices[LRindex+1] = ptUL_down.y;
 		vertices[LRindex+2] = ptUL_down.z;
 
+		////////////////////////////
+		//switch PI/2 and 0, and extreme point mirrring to get back to old broken instead of new broken
+		////////////////////////////////
+
 		//create upper left of mesh lattice if it is greater than one vertex
 		if (LRindex > 0) {
 			//create bottom horizantle branch of mesh points, starting with LRindex and working left towards the edge
 			for (int i = 3; i < terrainNum * 3; i += 3) {
 				index = LRindex - i;
 				refPt = double_vec_(vertices[index + 3], vertices[index + 4], vertices[index + 5]);
-				temp = downScale(calcSurfacePoint(0, refPt, sideLength));
+				temp = downScale(calcSurfacePoint(PI / 2, refPt, sideLength));
 				vertices[index] = temp.x;
 				vertices[index + 1] = temp.y;
 				vertices[index + 2] = temp.z;
@@ -545,7 +596,7 @@ public:
 				index = LRindex - j;
 				refPt = double_vec_(vertices[index], vertices[index + 1], vertices[index + 2]);
 				for (int k = meshWidth*3; k < meshWidth*terrainNum*3; k += meshWidth*3) {
-					temp = downscale(calcSurfacePoint(PI / 2, double_vec_(vertices[index], vertices[index + 1], vertices[index + 2]), sideLength));
+					temp = downscale(calcSurfacePoint(0, double_vec_(vertices[index], vertices[index + 1], vertices[index + 2]), sideLength));
 					index -= meshWidth * 3;
 					vertices[index] = temp.x;
 					vertices[index + 1] = temp.y;
@@ -554,10 +605,10 @@ public:
 			}
 		}
 
-		//todo: mirroring wrong, repeating copying of certain vertices
+		//todo: mirroring wrong
 
 		//mirror points across verticle
-		double_vec_ planeNormal = calcSurfaceNormalTriangle(myCam.getPos(), planetCenter, extPointVertN);
+		double_vec_ planeNormal = calcSurfaceNormalTriangle(myCam.getPos(), planetCenter, extPointHorzW);
 		double_vec_ planeNormal_normalized = planeNormal;
 		planeNormal_normalized.normalize();
 		for (int i = 0; i < halfMeshWidth * meshWidth * 3; i += meshWidth*3) {
@@ -577,7 +628,7 @@ public:
 		}
 
 		//mirror points across horizantle
-		planeNormal = planeNormal_normalized = calcSurfaceNormalTriangle(myCam.getPos(), planetCenter, extPointHorzW);
+		planeNormal = planeNormal_normalized = calcSurfaceNormalTriangle(myCam.getPos(), planetCenter, extPointVertN);
 		planeNormal_normalized.normalize();
 		for (int i = 0; i < halfMeshWidth * meshWidth * 3; i += meshWidth * 3) {
 			int k = meshWidth * (meshWidth - 1) * 3 - i;
@@ -603,6 +654,18 @@ public:
 			cout << "vert buffer pos" << i << ": " << vertices[i] << endl;
 		}
 		cout << "size of vert buffer: " << vertexBufferSize << endl;*/
+		/*cout << "vert buffer pos" << 0 << ": " << vertices[0] << endl;
+		cout << "vert buffer pos" << 1 << ": " << vertices[1] << endl;
+		cout << "vert buffer pos" << 2 << ": " << vertices[2] << endl;
+		cout << "vert buffer pos" << 15 << ": " << vertices[15] << endl;
+		cout << "vert buffer pos" << 16 << ": " << vertices[16] << endl;
+		cout << "vert buffer pos" << 17 << ": " << vertices[17] << endl; 
+		cout << "vert buffer pos" << 18 << ": " << vertices[18] << endl;
+		cout << "vert buffer pos" << 19 << ": " << vertices[19] << endl;
+		cout << "vert buffer pos" << 20 << ": " << vertices[20] << endl;
+		cout << "vert buffer pos" << 36 << ": " << vertices[36] << endl;
+		cout << "vert buffer pos" << 37 << ": " << vertices[37] << endl;
+		cout << "vert buffer pos" << 38 << ": " << vertices[38] << endl;*/
 
 		return vertices;
 		//delete vertices;
@@ -618,7 +681,7 @@ public:
 		elements = new GLuint[indexBufferSize];
 
 		//generate index buffer
-		int ind = 0, skipIndex = terrainWidth-1, row = 1;
+		int ind = 0, row = 1;
 		for (int i = 0; i < indexBufferSize; i += 6, ind++) {
 			elements[i + 0] = ind;
 			elements[i + 1] = ind + 1;
@@ -628,27 +691,69 @@ public:
 			elements[i + 4] = ind + terrainWidth + 1;
 			elements[i + 5] = ind + 1;
 
-			if (ind % ((int)terrainWidth * row - 2) == 0 && ind != 0) {
+			if (terrainNum > 1 && ind % ((int)terrainWidth * row - 2) == 0 && ind != 0) {
 				ind++;
 				row++;
 			}
 		}
 
+
+		//alt method for index gen
+		//int i = 0;
+		//for (int row = 0; row < terrainWidth - 1; row++) {
+		//	if ((row & 1) == 0) { // even rows
+		//		for (int col = 0; col < terrainWidth; col++) {
+		//			elements[i++] = col + row * terrainWidth;
+		//			elements[i++] = col + (row + 1) * terrainWidth;
+		//		}
+		//	}
+		//	else { // odd rows
+		//		for (int col = terrainWidth - 1; col > 0; col--) {
+		//			elements[i++] = col + (row + 1) * terrainWidth;
+		//			elements[i++] = col - 1 + +row * terrainWidth;
+		//		}
+		//	}
+		//}
+
 		//glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(elements), elements, GL_DYNAMIC_DRAW);
 		//glBindVertexArray(0);
 
 		//for debug
-		/*for (int i = 0; i < indexBufferSize; i++) {
-			cout << "index buffer pos" << i << ": " << elements[i] << endl;
-		}
-		cout << "size of index buffer: " << indexBufferSize << endl;*/
+		//for (int i = 0; i <  /*indexBufferSize*/33; i++) {
+		//	cout  << elements[i] << endl;
+		//}
+		//cout << "size of index buffer: " << indexBufferSize << endl;
 
 		return elements;
 		//delete elements;
 	}
 
-	//change input vertices and elements pointer to update different meshes
-	GLuint * updateMesh(GLfloat * vertices, GLuint * elements) {
+	//rotate a point x along a curve theta according to a determined axis
+	double_vec_ eulerRotate(bigFloat theta, double_vec_ axis, double_vec_ x) {
+		double_vec_ xPrime;
+
+		//shift x about the origin
+		double_vec_ shiftX = x - planetCenter;
+
+		//calculate rotated x
+		xPrime = (x * Cos(theta)) + (axis * (dotDouble(axis, x)*(bigFloat(1) - Cos(theta)))) + crossDouble(x, axis)*Sin(theta);
+
+		//reverse original shift of x for xPrime
+		xPrime += planetCenter;
+
+		return xPrime;
+	}
+
+	//find an axis from the planet center to the surface, such that it creates a 90deg angle with the vector between
+	//the input surface point and planet center, at a position theta on the circular slice the axis lies on
+	double_vec_ findRotationAxis(double_vec_ surfacePt, bigFloat theta) {
+		double_vec_ axisTop = calcSurfacePoint(theta, planetCenter, 2 * PLANET_RADIUS*PLANET_RADIUS);
+
+		return axisTop - planetCenter;
+	}
+
+	//change input vertices and elements pointer to update different meshes, resizeMode = 1 for shrink, 2 for expand
+	GLuint * updateMesh(GLfloat * vertices, GLuint * elements, int resizeMode) {
 		//generate the VAO
 		glGenVertexArrays(1, &VertexArrayID);
 		glBindVertexArray(VertexArrayID);
@@ -657,12 +762,10 @@ public:
 		glGenBuffers(1, &VertexBufferID);
 		//set the current state to focus on our vertex buffer
 		glBindBuffer(GL_ARRAY_BUFFER, VertexBufferID);
+		vec3 centerTemp = downScale(centerSurfacePoint);
 
-		/*extPointHorzW = calcSurfacePoint(PI, myCam.getPos() - planetCenter, halfSideLength);
-		extPointHorzE = calcSurfacePoint(0, myCam.getPos() - planetCenter, halfSideLength);
-		extPointVertN = calcSurfacePoint(PI / 2, myCam.getPos() - planetCenter, halfSideLength);
-		extPointVertS = calcSurfacePoint(3 * PI / 2, myCam.getPos() - planetCenter, halfSideLength);*/
 		centerSurfacePoint = calcCenterSurfacePt();
+		centerTemp = downScale(centerSurfacePoint);
 		extPointHorzW = calcSurfacePoint(PI, centerSurfacePoint, halfSideLength);
 		extPointHorzE = calcSurfacePoint(0, centerSurfacePoint, halfSideLength);
 		extPointVertN = calcSurfacePoint(PI / 2, centerSurfacePoint, halfSideLength);
@@ -686,6 +789,65 @@ public:
 		glBindVertexArray(0);
 
 		return elements;
+	}
+
+	float findTriangleArea(vec3 A, vec3 B, vec3 C) {
+		return (A.x * (B.y - C.y) + B.x * (C.y - A.y) + C.x * (A.y - B.y)) / 2;
+	}
+
+	void updateOnMove() {
+		//reset rotation variables
+		rotationTheta = 0;
+		rotationAxis = double_vec_(NULL, NULL, NULL);
+
+		//save globals
+		double_vec_ tempExtPointHorzE = extPointHorzE;
+		double_vec_ tempExtPointHorzW = extPointHorzW;
+		double_vec_ tempExtPointVertN = extPointVertN;
+		double_vec_ tempExtPointVertS = extPointVertS;
+		double_vec_ tempSurfacePt;
+
+		//size of triangle formed by newCamPos, oldCamPos, and the planet center
+		float triangleSize = findTriangleArea(downScale(newCamPos), downScale(oldCamPos), downScale(planetCenter));
+		
+		//if triangleSize is positive, the camera has moved away from the vector it was previously on with the planet center, meaning rotation is needed
+		if (triangleSize > 0) {
+			tempSurfacePt = calcCenterSurfacePt();
+
+			//find angle between tempSurfacePt (point between new cam pos and planet center) and centerSurfacePoint (old surface pt)
+			float distA = distance_vec(tempSurfacePt, centerSurfacePoint).ToFloat();
+			rotationTheta = acos((2 * PLANET_RADIUS*PLANET_RADIUS - distA * distA) / 2 * PLANET_RADIUS*PLANET_RADIUS);
+
+			//find axis of rotation
+			rotationAxis = findRotationAxis(centerSurfacePoint, PI / 2);
+
+			//rotate extreme points using euler's theorem
+			extPointHorzE = eulerRotate(rotationTheta, rotationAxis, tempExtPointHorzE);
+			extPointHorzW = eulerRotate(rotationTheta, rotationAxis, tempExtPointHorzW);
+			extPointVertN = eulerRotate(rotationTheta, rotationAxis, tempExtPointVertN);
+			extPointVertS = eulerRotate(rotationTheta, rotationAxis, tempExtPointVertS);
+			centerSurfacePoint = tempSurfacePt;
+		}
+
+		//check if resize is needed and of what kind
+		int horizonNum = checkHorizon();
+		
+		if (horizonNum > 0 && (2 < terrainNum < 26)) {
+			//resize larger
+			if (horizonNum == 2) 
+				terrainNum++;
+
+			//resize smaller
+			else if (horizonNum == 1)
+				terrainNum--;
+
+			//update buffer
+			indexBufferData = updateMesh(vertexBufferData, indexBufferData, horizonNum);
+
+			//reset rotation variables because if resizing rotation will be done automatically, we don't want to rotate twice
+			rotationTheta = 0;
+			rotationAxis = double_vec_(NULL, NULL, NULL);
+		}
 	}
 
 	//initialize meshes, VAO, VBO
@@ -765,7 +927,11 @@ public:
 		prog->addUniform("M");
 		prog->addUniform("maxAltitude");
 		prog->addAttribute("vertPos");
+		prog->addUniform("theta");
+		prog->addUniform("axis");
+		prog->addUniform("planetCenter");
 
+		
 		initGeom();
 	}
 
@@ -775,18 +941,24 @@ public:
 		double frametime = get_last_elapsed_time();
 		count += frametime;
 
-		//if the mesh is too small, resize it
+		//check camera moved, and if mesh needs altering
 		//todo, uncomment and test on shit appears
-		int horizonNum = checkHorizon();
-		if (horizonNum == 2 && terrainNum < 26) {
-			terrainNum++;
-			indexBufferData = updateMesh(vertexBufferData, indexBufferData);
-		}
+		/*if (myCam.moved) {
+			//check to see if mesh should be rotated
+			//double_vec_ tempCenter = calcCenterSurfacePt();
 
-		else if (horizonNum == 1 && terrainNum > 2) {
-			terrainNum--;
-			indexBufferData = updateMesh(vertexBufferData, indexBufferData);
-		}
+			//check to see if mesh needs to be resized
+			int horizonNum = checkHorizon();
+			if (horizonNum == 2 && terrainNum < 26) {
+				terrainNum++;
+				indexBufferData = updateMesh(vertexBufferData, indexBufferData);
+			}
+
+			else if (horizonNum == 1 && terrainNum > 2) {
+				terrainNum--;
+				indexBufferData = updateMesh(vertexBufferData, indexBufferData);
+			}
+		}*/
 
 		//TEST code for camera tests
 		// Get current frame buffer size.
@@ -814,6 +986,7 @@ public:
 		mat4 V = myCam.process(frametime);
 
 		Model->pushMatrix();
+		Model->translate(vec3(xChange, yChange, zChange));
 		//Model->translate(vec3(myCam.getPos().x.ToFloat(), myCam.getPos().y.ToFloat(), myCam.getPos().z.ToFloat()));
 		//Model->rotate(-myCam.getRot().x, vec3(1, 0, 0));
 		//Model->rotate(-myCam.getRot().y, vec3(0, 1, 0));
@@ -824,17 +997,18 @@ public:
 		glUniformMatrix4fv(prog->getUniform("V"), 1, GL_FALSE, &V[0][0]);
 		glUniformMatrix4fv(prog->getUniform("M"), 1, GL_FALSE, value_ptr(Model->topMatrix()));
 		glUniform1f(prog->getUniform("maxAltitude"), maxAltitude);
+		glUniform1f(prog->getUniform("theta"), rotationTheta);
 		glBindVertexArray(VertexArrayID);
 
 		//draw triangles
 		/*for (int i = 0; i < 12; i++) {
 			cout << vertexBufferData[i] << endl;
 		}
-		for (int i = 0; i < 6; i++) {
+		for (int i = 0; i < indexBufferSize / 3 - 20; i++) {
 			cout << indexBufferData[i] << endl;
 		}*/
 		//use GL_TRIANGLE to draw everything filled in
-		glDrawElements(DRAW_MODE, sizeof(indexBufferData)*indexBufferSize, GL_UNSIGNED_INT, nullptr);
+		glDrawElements(DRAW_MODE, indexBufferSize, GL_UNSIGNED_INT, nullptr);
 
 		glBindVertexArray(0);
 
@@ -883,83 +1057,52 @@ int main(int argc, char **argv) {
 }
 
 
-//TODO: learn from this to init planet meshes
-//void init_mesh()
-//{
-//
-//	//generate the VAO
-//	glGenVertexArrays(1, &VertexArrayID);
-//	glBindVertexArray(VertexArrayID);
-//
-//	//generate vertex buffer to hand off to OGL
-//	glGenBuffers(1, &MeshPosID);
-//	glBindBuffer(GL_ARRAY_BUFFER, MeshPosID);
-//	glm::vec3 *vertices = new glm::vec3[MESHSIZE * MESHSIZE * 6];
-//	for (int x = 0; x < MESHSIZE; x++)
-//	{
-//		for (int z = 0; z < MESHSIZE; z++)
-//		{
-//			vertices[x * 6 + z * MESHSIZE * 6 + 0] = vec3(0.0, 0.0, 0.0) + vec3(x, 0, z);//LD
-//			vertices[x * 6 + z * MESHSIZE * 6 + 1] = vec3(1.0, 0.0, 0.0) + vec3(x, 0, z);//RD
-//			vertices[x * 6 + z * MESHSIZE * 6 + 2] = vec3(1.0, 0.0, 1.0) + vec3(x, 0, z);//RU
-//			vertices[x * 6 + z * MESHSIZE * 6 + 3] = vec3(0.0, 0.0, 0.0) + vec3(x, 0, z);//LD
-//			vertices[x * 6 + z * MESHSIZE * 6 + 4] = vec3(1.0, 0.0, 1.0) + vec3(x, 0, z);//RU
-//			vertices[x * 6 + z * MESHSIZE * 6 + 5] = vec3(0.0, 0.0, 1.0) + vec3(x, 0, z);//LU
-//
-//			/*Debug vertices
-//			printf("x = %d : z = %d\n", x, z);
-//			printf("{%f, %f, %f}\n", vertices[x * 6 + z * MESHSIZE * 6 + 0].x, vertices[x * 6 + z * MESHSIZE * 6 + 0].y, vertices[x * 6 + z * MESHSIZE * 6 + 0].z);
-//			printf("{%f, %f, %f}\n", vertices[x * 6 + z * MESHSIZE * 6 + 1].x, vertices[x * 6 + z * MESHSIZE * 6 + 1].y, vertices[x * 6 + z * MESHSIZE * 6 + 1].z);
-//			printf("{%f, %f, %f}\n", vertices[x * 6 + z * MESHSIZE * 6 + 2].x, vertices[x * 6 + z * MESHSIZE * 6 + 2].y, vertices[x * 6 + z * MESHSIZE * 6 + 2].z);
-//			printf("{%f, %f, %f}\n", vertices[x * 6 + z * MESHSIZE * 6 + 3].x, vertices[x * 6 + z * MESHSIZE * 6 + 3].y, vertices[x * 6 + z * MESHSIZE * 6 + 3].z);
-//			printf("{%f, %f, %f}\n", vertices[x * 6 + z * MESHSIZE * 6 + 4].x, vertices[x * 6 + z * MESHSIZE * 6 + 4].y, vertices[x * 6 + z * MESHSIZE * 6 + 4].z);
-//			printf("{%f, %f, %f}\n\n", vertices[x * 6 + z * MESHSIZE * 6 + 5].x, vertices[x * 6 + z * MESHSIZE * 6 + 5].y, vertices[x * 6 + z * MESHSIZE * 6 + 5].z);
-//			*/
-//		}
-//
-//	}
-//	glBufferData(GL_ARRAY_BUFFER, sizeof(vec3) * MESHSIZE * MESHSIZE * 6, vertices, GL_DYNAMIC_DRAW);
-//	glEnableVertexAttribArray(0);
-//	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
-//	delete[] vertices;
-//	//tex coords
-//	/*float t = 1. / MESHSIZE;
-//	vec2 *tex = new vec2[MESHSIZE * MESHSIZE * 6];
-//	for (int x = 0; x<MESHSIZE; x++)
-//		for (int y = 0; y < MESHSIZE; y++)
-//		{
-//			tex[x * 6 + y*MESHSIZE * 6 + 0] = vec2(0.0, 0.0)+ vec2(x, y)*t;	//LD
-//			tex[x * 6 + y*MESHSIZE * 6 + 1] = vec2(t, 0.0)+ vec2(x, y)*t;	//RD
-//			tex[x * 6 + y*MESHSIZE * 6 + 2] = vec2(t, t)+ vec2(x, y)*t;		//RU
-//			tex[x * 6 + y*MESHSIZE * 6 + 3] = vec2(0.0, 0.0) + vec2(x, y)*t;	//LD
-//			tex[x * 6 + y*MESHSIZE * 6 + 4] = vec2(t, t) + vec2(x, y)*t;		//RU
-//			tex[x * 6 + y*MESHSIZE * 6 + 5] = vec2(0.0, t)+ vec2(x, y)*t;	//LU
-//		}
-//	glGenBuffers(1, &MeshTexID);
-//	//set the current state to focus on our vertex buffer
-//	glBindBuffer(GL_ARRAY_BUFFER, MeshTexID);
-//	glBufferData(GL_ARRAY_BUFFER, sizeof(vec2) * MESHSIZE * MESHSIZE * 6, tex, GL_STATIC_DRAW);
-//	glEnableVertexAttribArray(1);
-//	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
-//	delete[] tex;*/
-//	/*glGenBuffers(1, &IndexBufferIDBox);
-//	//set the current state to focus on our vertex buffer
-//	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IndexBufferIDBox);
-//	GLuint *elements = new GLuint[MESHSIZE * MESHSIZE * 8];
-////	GLuint ele[10000];
-//	int ind = 0,i=0;
-//	for (i = 0; i<(MESHSIZE * MESHSIZE * 8); i+=8, ind+=6)
-//		{
-//		elements[i + 0] = ind + 0;
-//		elements[i + 1] = ind + 1;
-//		elements[i + 2] = ind + 1;
-//		elements[i + 3] = ind + 2;
-//		elements[i + 4] = ind + 2;
-//		elements[i + 5] = ind + 5;
-//		elements[i + 6] = ind + 5;
-//		elements[i + 7] = ind + 0;
-//		}
-//	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLuint)*MESHSIZE * MESHSIZE * 8, elements, GL_STATIC_DRAW);
-//	delete[] elements;*/
-//	glBindVertexArray(0);
-//}
+//probably can be moved to graphics card, or maybe generate then pass as uniform
+	////////////////////////////////////////////////////////////////
+	//float getAltitude(float color) {
+	//	float tempHeight = color / 127.5 - 1.0f;
+	//	return tempHeight * maxAltitude;
+	//}
+
+	//float generateHeight(float x, float z, int seed) {
+	//	float total = 0;
+	//	for (int i = 0; i < octaves; i++) {
+	//		float divisor = 8.0 / pow(2, i);
+	//		total += getInterpolatedNoise(x / divisor, z / divisor, seed) * (maxAltitude / pow(3, i));
+	//	}
+	//	return total;
+	//}
+
+	//float getInterpolatedNoise(float x, float z, int seed) {
+	//	int intX = (int)x;
+	//	int intZ = (int)z;
+	//	float fracX = x - intX;
+	//	float fracZ = z - intZ;
+
+	//	float v1 = getSmoothNoise(intX, intZ, seed);
+	//	float v2 = getSmoothNoise(intX + 1, intZ, seed);
+	//	float v3 = getSmoothNoise(intX, intZ + 1, seed);
+	//	float v4 = getSmoothNoise(intX + 1, intZ + 1, seed);
+	//	float i1 = interpolate(v1, v2, fracX);
+	//	float i2 = interpolate(v3, v4, fracX);
+	//	return interpolate(i1, i2, fracZ);
+	//}
+
+	//float interpolate(float a, float b, float blend) {
+	//	double t = blend * PI;
+	//	float f = (float)(1.0 - cos(t)) * 0.5f;
+	//	return a * (1 - f) + b * f;
+	//}
+
+	//float getSmoothNoise(int x, int z, int seed) {
+	//	float corners = (getNoise(x - 1, z - 1, seed) + getNoise(x + 1, z - 1, seed) + getNoise(x - 1, z + 1, seed) + getNoise(x + 1, z + 1, seed)) / 16.0f;
+	//	float sides = (getNoise(x - 1, z, seed) + getNoise(x + 1, z, seed) + getNoise(x, z - 1, seed) + getNoise(x, z + 1, seed)) / 8.0f;
+	//	float center = getNoise(x, z, seed) / 4.0f;
+	//	return corners + sides + center;
+	//}
+
+	//float getNoise(int x, int z, int seed) {
+	//	srand(x * 49632 + z * 325176 + seed);
+	//	return ((float)rand() / RAND_MAX) * 2.0f - 1.0f;
+	//}
+	/////////////////////////////////////////////////////////////////////////

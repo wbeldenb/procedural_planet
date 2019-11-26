@@ -35,6 +35,14 @@ void Program::setShaderNames(const std::string &v, const std::string &f, const s
 	gShaderName = g;
 }
 
+void Program::setShaderNames(const std::string &v, const std::string &f, const std::string &c, const std::string &e)
+{
+	vShaderName = v;
+	fShaderName = f;
+	cShaderName = c;
+	eShaderName = e;
+}
+
 void Program::setShaderNames(const std::string &v, const std::string &f)
 {
 	vShaderName = v;
@@ -47,21 +55,37 @@ bool Program::init()
 	// Create shader handles
 	GLuint VS = glCreateShader(GL_VERTEX_SHADER);
 	GLuint FS = glCreateShader(GL_FRAGMENT_SHADER);
+	GLuint CS = -1;
+	GLuint ES = -1;
 	GLuint GS = -1;
 
 	// Read shader sources
 	std::string vShaderString = readFileAsString(vShaderName);
 	std::string fShaderString = readFileAsString(fShaderName);
+	std::string cShaderString = readFileAsString(cShaderName);
+	std::string eShaderString = readFileAsString(eShaderName);
 	std::string gShaderString = readFileAsString(gShaderName);
 	const char *vshader = vShaderString.c_str();
 	const char *fshader = fShaderString.c_str();
 	const char *gshader = gShaderString.c_str();
+	const char *cshader = cShaderString.c_str();
+	const char *eshader = eShaderString.c_str();
 	CHECKED_GL_CALL(glShaderSource(VS, 1, &vshader, NULL));
 	CHECKED_GL_CALL(glShaderSource(FS, 1, &fshader, NULL));
 	if (gShaderString.size() > 0)
 	{
 		GS = glCreateShader(GL_GEOMETRY_SHADER);
 		CHECKED_GL_CALL(glShaderSource(GS, 1, &gshader, NULL));
+	}
+	if (cShaderString.size() > 0)
+	{
+		CS = glCreateShader(GL_GEOMETRY_SHADER);
+		CHECKED_GL_CALL(glShaderSource(CS, 1, &cshader, NULL));
+	}
+	if (eShaderString.size() > 0)
+	{
+		ES = glCreateShader(GL_GEOMETRY_SHADER);
+		CHECKED_GL_CALL(glShaderSource(ES, 1, &eshader, NULL));
 	}
 	// Compile vertex shader
 	CHECKED_GL_CALL(glCompileShader(VS));
@@ -74,6 +98,34 @@ bool Program::init()
 			std::cout << "Error compiling vertex shader " << vShaderName << std::endl;
 		}
 		return false;
+	}
+	// Compile tessellation control shader
+	if (CS >= 0) {
+		CHECKED_GL_CALL(glCompileShader(CS));
+		CHECKED_GL_CALL(glGetShaderiv(CS, GL_COMPILE_STATUS, &rc));
+		if (!rc)
+		{
+			if (isVerbose())
+			{
+				GLSL::printShaderInfoLog(CS);
+				std::cout << "Error compiling tessellation control shader " << cShaderName << std::endl;
+			}
+			return false;
+		}
+	}
+	// Compile tessellation evaluation shader
+	if (ES >= 0) {
+		CHECKED_GL_CALL(glCompileShader(ES));
+		CHECKED_GL_CALL(glGetShaderiv(ES, GL_COMPILE_STATUS, &rc));
+		if (!rc)
+		{
+			if (isVerbose())
+			{
+				GLSL::printShaderInfoLog(ES);
+				std::cout << "Error compiling tessellation evaluation shader " << eShaderName << std::endl;
+			}
+			return false;
+		}
 	}
 	// Compile geometry shader
 	if (GS >= 0)
@@ -110,6 +162,10 @@ bool Program::init()
 	CHECKED_GL_CALL(glAttachShader(pid, FS));
 	if (GS >= 0)
 		CHECKED_GL_CALL(glAttachShader(pid, GS));
+	if (CS >= 0)
+		CHECKED_GL_CALL(glAttachShader(pid, CS));
+	if (ES >= 0)
+		CHECKED_GL_CALL(glAttachShader(pid, ES));
 	CHECKED_GL_CALL(glLinkProgram(pid));
 	CHECKED_GL_CALL(glGetProgramiv(pid, GL_LINK_STATUS, &rc));
 	if (!rc)
