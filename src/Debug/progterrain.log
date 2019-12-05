@@ -1,2 +1,17 @@
-﻿  Program.cpp
+﻿  main.cpp
+c:\users\belde\desktop\progterrain\src\main.cpp(74): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+c:\users\belde\desktop\progterrain\src\main.cpp(76): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+c:\users\belde\desktop\progterrain\src\main.cpp(78): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+c:\users\belde\desktop\progterrain\src\main.cpp(80): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+c:\users\belde\desktop\progterrain\src\main.cpp(84): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+c:\users\belde\desktop\progterrain\src\main.cpp(86): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+c:\users\belde\desktop\progterrain\src\main.cpp(90): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+c:\users\belde\desktop\progterrain\src\main.cpp(92): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+c:\users\belde\desktop\progterrain\src\main.cpp(287): warning C4305: '=': truncation from 'double' to 'float'
+c:\users\belde\desktop\progterrain\src\main.cpp(291): warning C4305: '=': truncation from 'double' to 'float'
+c:\users\belde\desktop\progterrain\src\main.cpp(682): warning C4244: '=': conversion from 'double' to 'int', possible loss of data
+c:\users\belde\desktop\progterrain\src\main.cpp(811): warning C4804: '<': unsafe use of type 'bool' in operation
+c:\users\belde\desktop\progterrain\src\main.cpp(923): warning C4244: 'argument': conversion from 'time_t' to 'unsigned int', possible loss of data
+c:\users\belde\desktop\progterrain\src\main.cpp(980): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+c:\users\belde\desktop\progterrain\src\main.cpp(1000): warning C4244: 'argument': conversion from 'double' to 'GLint', possible loss of data
   progterrain.vcxproj -> C:\Users\belde\Desktop\progterrain\Debug\progterrain.exe

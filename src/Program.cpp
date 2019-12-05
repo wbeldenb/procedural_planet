@@ -79,12 +79,12 @@ bool Program::init()
 	}
 	if (cShaderString.size() > 0)
 	{
-		CS = glCreateShader(GL_GEOMETRY_SHADER);
+		CS = glCreateShader(GL_TESS_CONTROL_SHADER);
 		CHECKED_GL_CALL(glShaderSource(CS, 1, &cshader, NULL));
 	}
 	if (eShaderString.size() > 0)
 	{
-		ES = glCreateShader(GL_GEOMETRY_SHADER);
+		ES = glCreateShader(GL_TESS_EVALUATION_SHADER);
 		CHECKED_GL_CALL(glShaderSource(ES, 1, &eshader, NULL));
 	}
 	// Compile vertex shader

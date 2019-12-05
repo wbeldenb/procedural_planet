@@ -121,7 +121,7 @@ private:
 	////////////////////
 	//planet constants//
 	////////////////////
-	uint DRAW_MODE = GL_TRIANGLE_STRIP;
+	uint DRAW_MODE = GL_FILL;
 	const double_vec_ planetCenter = double_vec_(0, 0, -(PLANET_RADIUS + 100));
 	//extreme point for LOD refactor testing
 	double_vec_ extPointVertN, extPointVertS, extPointHorzE, extPointHorzW;
@@ -135,7 +135,7 @@ private:
 	const bigFloat sideLength = planetCircum / numSides;
 	const bigFloat halfSideLength = sideLength / 2;
 	//factor to determine number of base points, equal to one quarter of total mesh points, numSides / 4
-	int terrainNum = 2;
+	int terrainNum = 25;
 	//factor to determine LOD mesh simplification
 	int LODnum = 1;
 	//center point between planet center and the camera
@@ -167,6 +167,9 @@ private:
 
 	//globals for camera movements deltas
 	double_vec_ newCamPos, oldCamPos;
+
+	//random seed
+	int randSeed;
 
 	//harcoded buffer for terrainNum 2 testing
 	//GLuint indexBufferData[54]{
@@ -335,11 +338,11 @@ public:
 		}
 
 		else if (key == GLFW_KEY_T && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-			DRAW_MODE = GL_TRIANGLES;
+			DRAW_MODE = GL_LINE;
 		}
 
 		else if (key == GLFW_KEY_Y && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-			DRAW_MODE = GL_LINE_STRIP;
+			DRAW_MODE = GL_FILL;
 		}
 
 		else if (key == GLFW_KEY_G && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
@@ -697,33 +700,6 @@ public:
 			}
 		}
 
-
-		//alt method for index gen
-		//int i = 0;
-		//for (int row = 0; row < terrainWidth - 1; row++) {
-		//	if ((row & 1) == 0) { // even rows
-		//		for (int col = 0; col < terrainWidth; col++) {
-		//			elements[i++] = col + row * terrainWidth;
-		//			elements[i++] = col + (row + 1) * terrainWidth;
-		//		}
-		//	}
-		//	else { // odd rows
-		//		for (int col = terrainWidth - 1; col > 0; col--) {
-		//			elements[i++] = col + (row + 1) * terrainWidth;
-		//			elements[i++] = col - 1 + +row * terrainWidth;
-		//		}
-		//	}
-		//}
-
-		//glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(elements), elements, GL_DYNAMIC_DRAW);
-		//glBindVertexArray(0);
-
-		//for debug
-		//for (int i = 0; i <  /*indexBufferSize*/33; i++) {
-		//	cout  << elements[i] << endl;
-		//}
-		//cout << "size of index buffer: " << indexBufferSize << endl;
-
 		return elements;
 		//delete elements;
 	}
@@ -906,37 +882,58 @@ public:
 
 	//initialize shaders, call geom initialization
 	void init(const std::string& resourceDirectory) {
+		cout << randSeed << endl;
 		GLSL::checkVersion();
 		//set background color.
 		glClearColor(.12f, .34f, .56f, 1.0f);
 		//enable z-buffer test.
 		glEnable(GL_DEPTH_TEST);
 
+		GLint mpv = 0;
+		glGetIntegerv(GL_MAX_PATCH_VERTICES, &mpv);
+		printf("max supported patch vertices %d\n", mpv);
+
 		//initialize the shader programs
 		prog = make_shared<Program>();
 		prog->setVerbose(true);
 		prog->setShaderNames(
 			resourceDirectory + "/simple_vert.glsl",
-			resourceDirectory + "/simple_frag.glsl");
+			resourceDirectory + "/simple_frag.glsl",
+			resourceDirectory + "/tess_Control.glsl",
+			resourceDirectory + "/tess_Eval.glsl");
+		
 		if (!prog->init()) {
 			std::cerr << "One or more shaders failed to compile... exiting!" << std::endl;
 			exit(1);
 		}
+		prog->addAttribute("position_VS_in");
+		prog->addAttribute("normal_VS_in");
+
 		prog->addUniform("P");
 		prog->addUniform("V");
 		prog->addUniform("M");
 		prog->addUniform("maxAltitude");
-		prog->addAttribute("vertPos");
 		prog->addUniform("theta");
 		prog->addUniform("axis");
 		prog->addUniform("planetCenter");
+		prog->addUniform("camPos");
+		prog->addUniform("meshSize");
+		prog->addUniform("randSeed");
 
-		
+		srand(time(NULL));
+		randSeed = rand() % 100;
+
 		initGeom();
 	}
 
 	//draw everything
 	void render() {
+
+		//uncomment for constantly changing landscapes!
+		/*srand(time(NULL));
+		randSeed = rand() % 100;*/
+
+
 		static double count = 0;
 		double frametime = get_last_elapsed_time();
 		count += frametime;
@@ -986,7 +983,7 @@ public:
 		mat4 V = myCam.process(frametime);
 
 		Model->pushMatrix();
-		Model->translate(vec3(xChange, yChange, zChange));
+		//Model->translate(vec3(xChange, yChange, zChange));
 		//Model->translate(vec3(myCam.getPos().x.ToFloat(), myCam.getPos().y.ToFloat(), myCam.getPos().z.ToFloat()));
 		//Model->rotate(-myCam.getRot().x, vec3(1, 0, 0));
 		//Model->rotate(-myCam.getRot().y, vec3(0, 1, 0));
@@ -996,19 +993,22 @@ public:
 		glUniformMatrix4fv(prog->getUniform("P"), 1, GL_FALSE, value_ptr(Projection->topMatrix()));
 		glUniformMatrix4fv(prog->getUniform("V"), 1, GL_FALSE, &V[0][0]);
 		glUniformMatrix4fv(prog->getUniform("M"), 1, GL_FALSE, value_ptr(Model->topMatrix()));
-		glUniform1f(prog->getUniform("maxAltitude"), maxAltitude);
+		glUniform3fv(prog->getUniform("camPos"), 1, value_ptr(downScale(myCam.getPos())));
+		glUniform1f(prog->getUniform("maxAltitude"), PLANET_RADIUS / 10);
 		glUniform1f(prog->getUniform("theta"), rotationTheta);
+		glUniform3fv(prog->getUniform("planetCenter"), 1, value_ptr(downScale(planetCenter)));
+		glUniform1i(prog->getUniform("meshSize"), pow((terrainNum * 2 - 1), 2));
+		glUniform1i(prog->getUniform("randSeed"), randSeed);
+
+
 		glBindVertexArray(VertexArrayID);
 
-		//draw triangles
-		/*for (int i = 0; i < 12; i++) {
-			cout << vertexBufferData[i] << endl;
-		}
-		for (int i = 0; i < indexBufferSize / 3 - 20; i++) {
-			cout << indexBufferData[i] << endl;
-		}*/
+		//set draw mode
+		glPolygonMode(GL_FRONT_AND_BACK, DRAW_MODE);
+
 		//use GL_TRIANGLE to draw everything filled in
-		glDrawElements(DRAW_MODE, indexBufferSize, GL_UNSIGNED_INT, nullptr);
+		//glPatchParameteri(GL_PATCH_VERTICES, 3.0f);
+		glDrawElements(GL_PATCHES, indexBufferSize, GL_UNSIGNED_INT, nullptr);
 
 		glBindVertexArray(0);
 
@@ -1055,54 +1055,3 @@ int main(int argc, char **argv) {
 	windowManager->shutdown();
 	return 0;
 }
-
-
-//probably can be moved to graphics card, or maybe generate then pass as uniform
-	////////////////////////////////////////////////////////////////
-	//float getAltitude(float color) {
-	//	float tempHeight = color / 127.5 - 1.0f;
-	//	return tempHeight * maxAltitude;
-	//}
-
-	//float generateHeight(float x, float z, int seed) {
-	//	float total = 0;
-	//	for (int i = 0; i < octaves; i++) {
-	//		float divisor = 8.0 / pow(2, i);
-	//		total += getInterpolatedNoise(x / divisor, z / divisor, seed) * (maxAltitude / pow(3, i));
-	//	}
-	//	return total;
-	//}
-
-	//float getInterpolatedNoise(float x, float z, int seed) {
-	//	int intX = (int)x;
-	//	int intZ = (int)z;
-	//	float fracX = x - intX;
-	//	float fracZ = z - intZ;
-
-	//	float v1 = getSmoothNoise(intX, intZ, seed);
-	//	float v2 = getSmoothNoise(intX + 1, intZ, seed);
-	//	float v3 = getSmoothNoise(intX, intZ + 1, seed);
-	//	float v4 = getSmoothNoise(intX + 1, intZ + 1, seed);
-	//	float i1 = interpolate(v1, v2, fracX);
-	//	float i2 = interpolate(v3, v4, fracX);
-	//	return interpolate(i1, i2, fracZ);
-	//}
-
-	//float interpolate(float a, float b, float blend) {
-	//	double t = blend * PI;
-	//	float f = (float)(1.0 - cos(t)) * 0.5f;
-	//	return a * (1 - f) + b * f;
-	//}
-
-	//float getSmoothNoise(int x, int z, int seed) {
-	//	float corners = (getNoise(x - 1, z - 1, seed) + getNoise(x + 1, z - 1, seed) + getNoise(x - 1, z + 1, seed) + getNoise(x + 1, z + 1, seed)) / 16.0f;
-	//	float sides = (getNoise(x - 1, z, seed) + getNoise(x + 1, z, seed) + getNoise(x, z - 1, seed) + getNoise(x, z + 1, seed)) / 8.0f;
-	//	float center = getNoise(x, z, seed) / 4.0f;
-	//	return corners + sides + center;
-	//}
-
-	//float getNoise(int x, int z, int seed) {
-	//	srand(x * 49632 + z * 325176 + seed);
-	//	return ((float)rand() / RAND_MAX) * 2.0f - 1.0f;
-	//}
-	/////////////////////////////////////////////////////////////////////////
