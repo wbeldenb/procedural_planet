@@ -7,11 +7,10 @@ c:\users\belde\desktop\progterrain\src\main.cpp(84): warning C4244: '=': convers
 c:\users\belde\desktop\progterrain\src\main.cpp(86): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
 c:\users\belde\desktop\progterrain\src\main.cpp(90): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
 c:\users\belde\desktop\progterrain\src\main.cpp(92): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
-c:\users\belde\desktop\progterrain\src\main.cpp(287): warning C4305: '=': truncation from 'double' to 'float'
-c:\users\belde\desktop\progterrain\src\main.cpp(291): warning C4305: '=': truncation from 'double' to 'float'
-c:\users\belde\desktop\progterrain\src\main.cpp(682): warning C4244: '=': conversion from 'double' to 'int', possible loss of data
-c:\users\belde\desktop\progterrain\src\main.cpp(811): warning C4804: '<': unsafe use of type 'bool' in operation
-c:\users\belde\desktop\progterrain\src\main.cpp(923): warning C4244: 'argument': conversion from 'time_t' to 'unsigned int', possible loss of data
-c:\users\belde\desktop\progterrain\src\main.cpp(980): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
-c:\users\belde\desktop\progterrain\src\main.cpp(1000): warning C4244: 'argument': conversion from 'double' to 'GLint', possible loss of data
+c:\users\belde\desktop\progterrain\src\main.cpp(130): warning C4244: 'initializing': conversion from 'double' to 'const int', possible loss of data
+c:\users\belde\desktop\progterrain\src\main.cpp(234): warning C4305: '=': truncation from 'double' to 'float'
+c:\users\belde\desktop\progterrain\src\main.cpp(238): warning C4305: '=': truncation from 'double' to 'float'
+c:\users\belde\desktop\progterrain\src\main.cpp(602): warning C4244: '=': conversion from 'double' to 'int', possible loss of data
+c:\users\belde\desktop\progterrain\src\main.cpp(869): warning C4244: 'argument': conversion from 'time_t' to 'unsigned int', possible loss of data
+c:\users\belde\desktop\progterrain\src\main.cpp(926): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
   progterrain.vcxproj -> C:\Users\belde\Desktop\progterrain\Debug\progterrain.exe

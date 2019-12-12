@@ -80,8 +80,9 @@ float getHeight(vec3 pos) {
 	float basePreIntensity = mix(0.7, 0.7, biomeHeight);
 	float power = 2;
 	float basePostIntensity = mix(3, 40, biomeHeight);
-	float translate = mix(0, 50, biomeHeight);
-
+	//float translate = mix(0, 50, biomeHeight);
+	//float translate = mix(-maxAltitude / 2, maxAltitude, biomeHeight);
+	float translate = mix(-50, 50, biomeHeight);
 
 	int heightOctaves = 11;
 	float heightFreq = 0.1;
@@ -94,6 +95,7 @@ float getHeight(vec3 pos) {
 	baseheight = pow(baseheight, power) * basePostIntensity;
 	height = baseheight * height + translate;
 
+
 	return height;
 }
 
@@ -102,10 +104,10 @@ float getHeight(vec3 pos) {
 void main() {
 	//interpolate the attributes of the output vertex using the barycentric coords
 	normal_FS_in = interpolate3D(normal_ES_in[0], normal_ES_in[1], normal_ES_in[2]);
-	normal_FS_in = normalize(normal_FS_in);
 	position_FS_in = interpolate3D(position_ES_in[0], position_ES_in[1], position_ES_in[2]);
 
 	vec3 normal = normalize(position_FS_in - planetCenter);
+	normal_FS_in = normalize(normal);
 
 	//float height = noise(position_FS_in.xyz, 2, 0.01f, 0.1f) * maxAltitude;
 	float height = getHeight(position_FS_in.xyz);

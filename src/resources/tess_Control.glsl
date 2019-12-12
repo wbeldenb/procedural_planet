@@ -4,7 +4,8 @@
 layout (vertices = 3) out;
 
 uniform vec3 camPos;
-uniform int meshSize;
+uniform int meshMaxSize;
+uniform int resolution;
 
 //attributes of the input control points
 in vec3 position_CS_in[];
@@ -16,13 +17,14 @@ out vec3 normal_ES_in[];
 
 //calculate the tessellation level
 float calculateTessFactLinear() {
-	float df = meshSize * 2.0f;
-	float dist = df - length(camPos.xyz + position_CS_in[gl_InvocationID].xyz);
+	float df = meshMaxSize * resolution;
+	float dist = df - length(camPos.xyz - position_CS_in[gl_InvocationID].xyz);
+	//float dist = df - distance(camPos.xyz, position_CS_in[gl_InvocationID].xyz);
 	dist /= df;
 	dist = pow(dist, 5);
 
 	//increase constant dist multiplied by for higher max tess levels
-	float tessfact = dist * 5;
+	float tessfact = dist * 40;
 	tessfact = max(1, tessfact);
 
 	return tessfact;

@@ -26,7 +26,7 @@ using namespace glm;
 using namespace ttmath;
 
 //planet constant for easy changing
-#define PLANET_RADIUS 1000
+#define PLANET_RADIUS 7000
 
 //calculate time offsets
 double get_last_elapsed_time() {
@@ -46,7 +46,7 @@ private:
 
 public:
 	double deltaX, deltaY, prevX, prevY;
-	bool w, a, s, d, moved;
+	bool w, a, s, d, moved = false;
 	float theta, phi;
 
 	camera() {
@@ -58,7 +58,7 @@ public:
 	}
 
 	double_vec_ getPos() {
-		return pos;
+		return -1.f*pos;
 	}
 
 	vec3 getRot() {
@@ -68,7 +68,7 @@ public:
 	mat4 process(double fTime) {
 		float speedFB = 0;
 		float speedLR = 0;
-		float fwdspeed = 50;
+		float fwdspeed = 500;
 
 		if (w)
 			speedFB = fwdspeed * fTime;
@@ -127,6 +127,7 @@ private:
 	double_vec_ extPointVertN, extPointVertS, extPointHorzE, extPointHorzW;
 	//number of subdivions to great a n-gon to create planet sphere
 	const int numSides = 100;
+	const int maxMeshSize = pow(numSides / 2 - 1, 2);
 	//angle between center point of the planet for any two adjacent points on the planets equator
 	const bigFloat deltaTheta = 2 * PI / numSides;
 	//planet circumference
@@ -140,6 +141,8 @@ private:
 	int LODnum = 1;
 	//center point between planet center and the camera
 	double_vec_ centerSurfacePoint;
+	//resolution constant for tesselation
+	int resolution = PLANET_RADIUS / 500;
 
 	// Contains vertex information for OpenGL
 	GLuint VertexArrayID;
@@ -149,8 +152,7 @@ private:
 	GLuint IndexBufferID;
 	//variables for terrain size
 	int terrainWidth = terrainNum * 2;
-	int terrainDepth = 100;
-	float maxAltitude = 20;
+	float maxAltitude = PLANET_RADIUS / 25;
 
 	//buffers for terrain generation
 	GLfloat *vertexBufferData;
@@ -158,7 +160,7 @@ private:
 
 	//globals for mesh rotations
 	GLfloat rotationTheta = 0.f;
-	double_vec_ rotationAxis = double_vec_(NULL, NULL, NULL);
+	double_vec_ rotationAxis = double_vec_(0, 0, 0);
 
 	//globals for test translation
 	GLint xChange = 0;
@@ -168,72 +170,17 @@ private:
 	//globals for camera movements deltas
 	double_vec_ newCamPos, oldCamPos;
 
-	//random seed
+	//random seed global
 	int randSeed;
 
-	//harcoded buffer for terrainNum 2 testing
-	//GLuint indexBufferData[54]{
-	//	0,
-	//	1,
-	//	4,
-	//	4,
-	//	5,
-	//	1,
-	//	1,
-	//	2,
-	//	5,
-	//	5,
-	//	6,
-	//	2,
-	//	2,
-	//	3,
-	//	6,
-	//	6,
-	//	7,
-	//	3,
-	//	4,
-	//	5,
-	//	8,
-	//	8,
-	//	9,
-	//	5,
-	//	5,
-	//	6,
-	//	9,
-	//	9,
-	//	10,
-	//	6,
-	//	6,
-	//	7,
-	//	10,
-	//	10,
-	//	11,
-	//	7,
-	//	8,
-	//	9,
-	//	12,
-	//	12,
-	//	13,
-	//	9,
-	//	9,
-	//	10,
-	//	13,
-	//	13,
-	//	14,
-	//	10,
-	//	10,
-	//	11,
-	//	14,
-	//	14,
-	//	15,
-	//	11,
-	//};
 	//globals to store buffer sizes to ensure data is transfered to GPU  correctly
 	int vertexBufferSize = 0, indexBufferSize = 0;
 	//GLfloat vertexBufferData[12] = { 0 };
 	//GLuint indexBufferData[6] = { 0 };
 
 	int octaves = 8;
+
+	double_vec_ startingCenterPos;
 
 public:
 	WindowManager * windowManager = nullptr;
@@ -346,17 +293,15 @@ public:
 		}
 
 		else if (key == GLFW_KEY_G && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-			if (terrainNum < 26) {
-				terrainNum++;
-				indexBufferData = updateMesh(vertexBufferData, indexBufferData, 2);
-			}
+			/*if (terrainNum < 26)
+				terrainNum++;*/
+			maxAltitude = PLANET_RADIUS / 25;
 		}
 
 		else if (key == GLFW_KEY_H && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-			if (terrainNum > 2) {
-				terrainNum--;
-				indexBufferData = updateMesh(vertexBufferData, indexBufferData, 1);
-			}
+			/*if (terrainNum > 3)
+				terrainNum--;*/
+			maxAltitude = 50;
 		}
 
 		else if (key == GLFW_KEY_O && (action == GLFW_PRESS || action == GLFW_REPEAT))
@@ -397,7 +342,7 @@ public:
 	int checkHorizon() {
 		//calculate hypotenuse of right triangle formed by camera, planet center, and farthest visible point on horizon
 		//the lengths of the sides being the the altitude of the camera(h), the planet radius, and len (unknown)
-		float h = Abs(distance_vec(-1.f*myCam.getPos(), planetCenter)).ToFloat() - PLANET_RADIUS;
+		float h = Abs(distance_vec(myCam.getPos(), planetCenter)).ToFloat() - PLANET_RADIUS;
 		//the length from the camera to the farthest visible point on the horizon (rendered or not)
 		float len = sqrt(h*(2*PLANET_RADIUS + h));
 		//float h2 = Abs(distance_vec(myCam.getPos(), calcCenterSurfacePt())).ToFloat();
@@ -645,31 +590,6 @@ public:
 				}
 		}
 
-		//actually memcopy the data - only do this once
-		//glBufferData(GL_ARRAY_BUFFER, sizeof(VBOvertices), VBOvertices, GL_DYNAMIC_DRAW);
-		//glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
-
-		//memory cleanup/management
-		//delete VBOvertices;
-
-		//for debug
-		/*for (int i = 0; i < vertexBufferSize; i++) {
-			cout << "vert buffer pos" << i << ": " << vertices[i] << endl;
-		}
-		cout << "size of vert buffer: " << vertexBufferSize << endl;*/
-		/*cout << "vert buffer pos" << 0 << ": " << vertices[0] << endl;
-		cout << "vert buffer pos" << 1 << ": " << vertices[1] << endl;
-		cout << "vert buffer pos" << 2 << ": " << vertices[2] << endl;
-		cout << "vert buffer pos" << 15 << ": " << vertices[15] << endl;
-		cout << "vert buffer pos" << 16 << ": " << vertices[16] << endl;
-		cout << "vert buffer pos" << 17 << ": " << vertices[17] << endl; 
-		cout << "vert buffer pos" << 18 << ": " << vertices[18] << endl;
-		cout << "vert buffer pos" << 19 << ": " << vertices[19] << endl;
-		cout << "vert buffer pos" << 20 << ": " << vertices[20] << endl;
-		cout << "vert buffer pos" << 36 << ": " << vertices[36] << endl;
-		cout << "vert buffer pos" << 37 << ": " << vertices[37] << endl;
-		cout << "vert buffer pos" << 38 << ": " << vertices[38] << endl;*/
-
 		return vertices;
 		//delete vertices;
 	}
@@ -723,9 +643,11 @@ public:
 	//find an axis from the planet center to the surface, such that it creates a 90deg angle with the vector between
 	//the input surface point and planet center, at a position theta on the circular slice the axis lies on
 	double_vec_ findRotationAxis(double_vec_ surfacePt, bigFloat theta) {
-		double_vec_ axisTop = calcSurfacePoint(theta, planetCenter, 2 * PLANET_RADIUS*PLANET_RADIUS);
+		/*double_vec_ axisTop = calcSurfacePoint(theta, planetCenter, 2 * PLANET_RADIUS*PLANET_RADIUS);
 
-		return axisTop - planetCenter;
+		return axisTop - planetCenter;*/
+		double_vec_ aXb = crossDouble(surfacePt, startingCenterPos);
+		return aXb / (surfacePt.getlen() * startingCenterPos.getlen() * Sin(theta));
 	}
 
 	//change input vertices and elements pointer to update different meshes, resizeMode = 1 for shrink, 2 for expand
@@ -768,13 +690,20 @@ public:
 	}
 
 	float findTriangleArea(vec3 A, vec3 B, vec3 C) {
-		return (A.x * (B.y - C.y) + B.x * (C.y - A.y) + C.x * (A.y - B.y)) / 2;
+		vec3 AB = A - B;
+		vec3 AC = A - C;
+		float lengthAB = distance(A, B);
+		float lengthAC = distance(A, C);
+		float cosTheta = dot(AB, AC) / (lengthAB*lengthAC);
+		float sinTheta = sqrt(1 - pow(cosTheta, 2));
+		
+		return lengthAB * lengthAC * sinTheta / 2.f;
+		//return (A.x * (B.y - C.y) + B.x * (C.y - A.y) + C.x * (A.y - B.y)) / 2.f;
 	}
 
 	void updateOnMove() {
 		//reset rotation variables
-		rotationTheta = 0;
-		rotationAxis = double_vec_(NULL, NULL, NULL);
+		
 
 		//save globals
 		double_vec_ tempExtPointHorzE = extPointHorzE;
@@ -784,18 +713,29 @@ public:
 		double_vec_ tempSurfacePt;
 
 		//size of triangle formed by newCamPos, oldCamPos, and the planet center
-		float triangleSize = findTriangleArea(downScale(newCamPos), downScale(oldCamPos), downScale(planetCenter));
+		float triangleSize = findTriangleArea(downScale(myCam.getPos()), downScale(oldCamPos), downScale(planetCenter));
 		
 		//if triangleSize is positive, the camera has moved away from the vector it was previously on with the planet center, meaning rotation is needed
 		if (triangleSize > 0) {
+			rotationTheta = 0;
+			rotationAxis = double_vec_(NULL, NULL, NULL);
 			tempSurfacePt = calcCenterSurfacePt();
+			vec3 tempSurfacePtDown = downscale(tempSurfacePt);
+			vec3 centersurfacePtDown = downscale(centerSurfacePoint);
+			float dis = distance_vec(tempSurfacePt, startingCenterPos).ToFloat();
+			/*cout << "distance: " << dis << endl;
+			cout << "newCenterSurfacePt { " << tempSurfacePtDown.x;
+			cout << " : " << tempSurfacePtDown.y;
+			cout << " : " << tempSurfacePtDown.z << " }" << endl;*/
 
 			//find angle between tempSurfacePt (point between new cam pos and planet center) and centerSurfacePoint (old surface pt)
-			float distA = distance_vec(tempSurfacePt, centerSurfacePoint).ToFloat();
-			rotationTheta = acos((2 * PLANET_RADIUS*PLANET_RADIUS - distA * distA) / 2 * PLANET_RADIUS*PLANET_RADIUS);
+			rotationTheta = acos(((2 * PLANET_RADIUS*PLANET_RADIUS) - pow(dis, 2)) / (2 * PLANET_RADIUS * PLANET_RADIUS));//ACos(dotDouble(tempSurfacePt, startingCenterPos) / (tempSurfacePt.getlen()*startingCenterPos.getlen())).ToFloat();
+			//rotationTheta /= 2;
+			//cout << rotationTheta << endl;
 
 			//find axis of rotation
-			rotationAxis = findRotationAxis(centerSurfacePoint, PI / 2);
+			rotationAxis = findRotationAxis(tempSurfacePt,rotationTheta);
+			vec3 rotAxDown = downscale(rotationAxis);
 
 			//rotate extreme points using euler's theorem
 			extPointHorzE = eulerRotate(rotationTheta, rotationAxis, tempExtPointHorzE);
@@ -804,26 +744,30 @@ public:
 			extPointVertS = eulerRotate(rotationTheta, rotationAxis, tempExtPointVertS);
 			centerSurfacePoint = tempSurfacePt;
 		}
+		/*vec3 myCamPosDown = downscale(myCam.getPos());
+		cout << "cam Pos { " << myCamPosDown.x;
+		cout << " : " << myCamPosDown.y;
+		cout << " : " << myCamPosDown.z << " }" << endl;
+		cout << "theta: " << rotationTheta << endl <<endl;*/
+		////check if resize is needed and of what kind
+		//int horizonNum = checkHorizon();
+		//
+		//if (horizonNum > 0 && (2 < terrainNum < 26)) {
+		//	//resize larger
+		//	if (horizonNum == 2) 
+		//		terrainNum++;
 
-		//check if resize is needed and of what kind
-		int horizonNum = checkHorizon();
-		
-		if (horizonNum > 0 && (2 < terrainNum < 26)) {
-			//resize larger
-			if (horizonNum == 2) 
-				terrainNum++;
+		//	//resize smaller
+		//	else if (horizonNum == 1)
+		//		terrainNum--;
 
-			//resize smaller
-			else if (horizonNum == 1)
-				terrainNum--;
+		//	//update buffer
+		//	indexBufferData = updateMesh(vertexBufferData, indexBufferData, horizonNum);
 
-			//update buffer
-			indexBufferData = updateMesh(vertexBufferData, indexBufferData, horizonNum);
-
-			//reset rotation variables because if resizing rotation will be done automatically, we don't want to rotate twice
-			rotationTheta = 0;
-			rotationAxis = double_vec_(NULL, NULL, NULL);
-		}
+		//	//reset rotation variables because if resizing rotation will be done automatically, we don't want to rotate twice
+		//	rotationTheta = 0;
+		//	rotationAxis = double_vec_(NULL, NULL, NULL);
+		//}
 	}
 
 	//initialize meshes, VAO, VBO
@@ -842,7 +786,7 @@ public:
 		glBindBuffer(GL_ARRAY_BUFFER, VertexBufferID);
 
 		//oriantation looking from planet center towards camera
-		centerSurfacePoint = calcCenterSurfacePt();
+		centerSurfacePoint = startingCenterPos= calcCenterSurfacePt();
 		extPointHorzW = calcSurfacePoint(PI, centerSurfacePoint, halfSideLength);
 		extPointHorzE = calcSurfacePoint(0, centerSurfacePoint, halfSideLength);
 		extPointVertN = calcSurfacePoint(PI / 2, centerSurfacePoint, halfSideLength);
@@ -882,7 +826,7 @@ public:
 
 	//initialize shaders, call geom initialization
 	void init(const std::string& resourceDirectory) {
-		cout << randSeed << endl;
+		//cout << randSeed << endl;
 		GLSL::checkVersion();
 		//set background color.
 		glClearColor(.12f, .34f, .56f, 1.0f);
@@ -919,7 +863,9 @@ public:
 		prog->addUniform("camPos");
 		prog->addUniform("meshSize");
 		prog->addUniform("randSeed");
-
+		prog->addUniform("meshMaxSize");
+		prog->addUniform("resolution");
+			   
 		srand(time(NULL));
 		randSeed = rand() % 100;
 
@@ -928,11 +874,11 @@ public:
 
 	//draw everything
 	void render() {
+		int v = 0;
 
 		//uncomment for constantly changing landscapes!
 		/*srand(time(NULL));
 		randSeed = rand() % 100;*/
-
 
 		static double count = 0;
 		double frametime = get_last_elapsed_time();
@@ -981,25 +927,29 @@ public:
 
 		//View for fps camera
 		mat4 V = myCam.process(frametime);
+		if (myCam.moved)
+			updateOnMove();
 
 		Model->pushMatrix();
-		//Model->translate(vec3(xChange, yChange, zChange));
-		//Model->translate(vec3(myCam.getPos().x.ToFloat(), myCam.getPos().y.ToFloat(), myCam.getPos().z.ToFloat()));
-		//Model->rotate(-myCam.getRot().x, vec3(1, 0, 0));
-		//Model->rotate(-myCam.getRot().y, vec3(0, 1, 0));
+		if (rotationTheta > 0) {
+			Model->translate(downscale(planetCenter));
+			Model->rotate(rotationTheta, downScale(rotationAxis));
+			Model->translate(-downscale(planetCenter));
+		}
 
 		//Draw our scene - two meshes - right now to a texture
 		prog->bind();
 		glUniformMatrix4fv(prog->getUniform("P"), 1, GL_FALSE, value_ptr(Projection->topMatrix()));
 		glUniformMatrix4fv(prog->getUniform("V"), 1, GL_FALSE, &V[0][0]);
 		glUniformMatrix4fv(prog->getUniform("M"), 1, GL_FALSE, value_ptr(Model->topMatrix()));
-		glUniform3fv(prog->getUniform("camPos"), 1, value_ptr(downScale(myCam.getPos())));
-		glUniform1f(prog->getUniform("maxAltitude"), PLANET_RADIUS / 10);
+		glUniform3fv(prog->getUniform("camPos"), 1, &downScale(myCam.getPos())[0]);
+		glUniform1f(prog->getUniform("maxAltitude"), maxAltitude);
 		glUniform1f(prog->getUniform("theta"), rotationTheta);
+		glUniform3fv(prog->getUniform("axis"), 1, value_ptr(downScale(rotationAxis)));
 		glUniform3fv(prog->getUniform("planetCenter"), 1, value_ptr(downScale(planetCenter)));
-		glUniform1i(prog->getUniform("meshSize"), pow((terrainNum * 2 - 1), 2));
+		glUniform1i(prog->getUniform("meshMaxSize"), maxMeshSize);
 		glUniform1i(prog->getUniform("randSeed"), randSeed);
-
+		glUniform1i(prog->getUniform("resolution"), resolution);
 
 		glBindVertexArray(VertexArrayID);
 
