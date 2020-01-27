@@ -24,7 +24,7 @@ float calculateTessFactLinear() {
 	dist = pow(dist, 5);
 
 	//increase constant dist multiplied by for higher max tess levels
-	float tessfact = dist * 40;
+	float tessfact = dist * 25;
 	tessfact = max(1, tessfact);
 
 	return tessfact;
@@ -35,7 +35,7 @@ void main() {
 	normal_ES_in[gl_InvocationID] = normal_CS_in[gl_InvocationID];
 	position_ES_in[gl_InvocationID] = position_CS_in[gl_InvocationID];
 
-	float tessfact = calculateTessFactLinear();
+	float tessfact = 1;//calculateTessFactLinear();
 
 	gl_TessLevelInner[0] = tessfact;
 	gl_TessLevelInner[1] = tessfact;

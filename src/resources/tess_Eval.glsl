@@ -1,6 +1,7 @@
 #version  410 core
 
 layout(triangles, equal_spacing, ccw) in;
+//layout(triangles, fractional_even_spacing, cw) in;
 
 uniform mat4 V;
 uniform mat4 P;
@@ -81,7 +82,7 @@ float getHeight(vec3 pos) {
 	float power = 2;
 	float basePostIntensity = mix(3, 40, biomeHeight);
 	//float translate = mix(0, 50, biomeHeight);
-	//float translate = mix(-maxAltitude / 2, maxAltitude, biomeHeight);
+	//float translate = mix(-maxAltitude, maxAltitude, biomeHeight);
 	float translate = mix(-50, 50, biomeHeight);
 
 	int heightOctaves = 11;
